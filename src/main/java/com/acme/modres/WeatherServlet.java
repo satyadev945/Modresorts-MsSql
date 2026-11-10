@@ -13,7 +13,6 @@ import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.ProtocolException;
 import java.net.URL;
-import java.util.Hashtable;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -35,8 +34,6 @@ import javax.management.NotCompliantMBeanException;
 import javax.management.ObjectInstance;
 import javax.management.ObjectName;
 import javax.management.ReflectionException;
-import javax.naming.InitialContext;
-import javax.naming.NamingException;
 import javax.servlet.annotation.WebServlet;
 
 @WebServlet({ "/resorts/weather" })
@@ -53,7 +50,9 @@ public class WeatherServlet extends HttpServlet {
 
   private static final Logger logger = Logger.getLogger(WeatherServlet.class.getName());
 
-  private static InitialContext context;
+  // JMX management is an optional, decoupled concern in containers. Enable with env var ENABLE_JMX_APPINFO=true
+  // (monitoring should otherwise be done via the /health endpoint and external metrics/sidecars).
+  private static final boolean JMX_ENABLED = Boolean.parseBoolean(System.getenv("ENABLE_JMX_APPINFO"));
 
   MBeanServer server;
   ObjectName weatherON;
@@ -61,6 +60,10 @@ public class WeatherServlet extends HttpServlet {
 
   @Override
   public void init() {
+    if (!JMX_ENABLED) {
+      logger.info("JMX AppInfo MBean registration disabled (set ENABLE_JMX_APPINFO=true to enable).");
+      return;
+    }
     server = ManagementFactory.getPlatformMBeanServer();
     try {
       weatherON = new ObjectName("com.acme.modres.mbean:name=appInfo");
@@ -75,12 +78,13 @@ public class WeatherServlet extends HttpServlet {
     } catch (InstanceAlreadyExistsException | MBeanRegistrationException | NotCompliantMBeanException e) {
       e.printStackTrace();
     }
-    context = setInitialContextProps();
+    // RMI/JNDI InitialContext lookup removed: it was unused and RMI registry is unavailable in containers.
+    // Use REST/gRPC endpoints via Kubernetes Service DNS (e.g. env var service URLs) for remote calls.
   }
 
   @Override
   public void destroy() {
-    if (mbean != null) {
+    if (mbean != null && server != null) {
       try {
         server.unregisterMBean(weatherON);
       } catch (MBeanRegistrationException | InstanceNotFoundException e) {
@@ -97,10 +101,12 @@ public class WeatherServlet extends HttpServlet {
     String methodName = "doGet";
     logger.entering(WeatherServlet.class.getName(), methodName);
 
-    try {
-      MBeanInfo weatherConfig = server.getMBeanInfo(weatherON);
-    } catch (IntrospectionException | InstanceNotFoundException | ReflectionException e) {
-      e.printStackTrace();
+    if (JMX_ENABLED && server != null && weatherON != null) {
+      try {
+        MBeanInfo weatherConfig = server.getMBeanInfo(weatherON);
+      } catch (IntrospectionException | InstanceNotFoundException | ReflectionException e) {
+        e.printStackTrace();
+      }
     }
 
     String city = request.getParameter("selectedCity");
@@ -253,26 +259,10 @@ public class WeatherServlet extends HttpServlet {
 
     String serverEnv = "";
 
-    serverEnv += com.ibm.websphere.runtime.ServerName.getDisplayName();
-    serverEnv += com.ibm.websphere.runtime.ServerName.getFullName();
+    String hostName = System.getenv("HOSTNAME");
+    serverEnv += (hostName != null) ? hostName : "localhost";
+    serverEnv += System.getProperty("java.vm.name", "");
 
     return serverEnv;
-  }
-
-  private InitialContext setInitialContextProps() {
-
-    Hashtable ht = new Hashtable();
-
-    ht.put("java.naming.factory.initial", "com.ibm.websphere.naming.WsnInitialContextFactory");
-    ht.put("java.naming.provider.url", "corbaloc:iiop:localhost:2809");
-
-    InitialContext ctx = null;
-    try {
-      ctx = new InitialContext(ht);
-    } catch (NamingException e) {
-      e.printStackTrace();
-    }
-
-    return ctx;
   }
 }
