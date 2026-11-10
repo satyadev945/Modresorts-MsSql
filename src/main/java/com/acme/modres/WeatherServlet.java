@@ -17,13 +17,13 @@ import java.util.Hashtable;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import javax.servlet.ServletException;
-import javax.servlet.ServletOutputStream;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.ServletOutputStream;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 import javax.management.InstanceAlreadyExistsException;
 import javax.management.InstanceNotFoundException;
 import javax.management.IntrospectionException;
@@ -37,7 +37,7 @@ import javax.management.ObjectName;
 import javax.management.ReflectionException;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
-import javax.servlet.annotation.WebServlet;
+import jakarta.servlet.annotation.WebServlet;
 
 @WebServlet({ "/resorts/weather" })
 public class WeatherServlet extends HttpServlet {
@@ -146,7 +146,7 @@ public class WeatherServlet extends HttpServlet {
     URL obj = null;
     HttpURLConnection con = null;
     try {
-      obj = new URL(resturl);
+      obj = java.net.URI.create(resturl).toURL();
       con = (HttpURLConnection) obj.openConnection();
       con.setRequestMethod("GET");
     } catch (MalformedURLException e1) {
@@ -170,7 +170,7 @@ public class WeatherServlet extends HttpServlet {
       ServletOutputStream out = null;
 
       try {
-        in = new BufferedReader(new InputStreamReader(con.getInputStream()));
+        in = new BufferedReader(new InputStreamReader(con.getInputStream(), java.nio.charset.StandardCharsets.UTF_8));
         String inputLine = null;
         StringBuffer responseStr = new StringBuffer();
 
@@ -253,8 +253,8 @@ public class WeatherServlet extends HttpServlet {
 
     String serverEnv = "";
 
-    serverEnv += com.ibm.websphere.runtime.ServerName.getDisplayName();
-    serverEnv += com.ibm.websphere.runtime.ServerName.getFullName();
+    serverEnv += System.getProperty("wlp.server.name", "defaultServer");
+    serverEnv += System.getProperty("wlp.user.dir", "");
 
     return serverEnv;
   }
