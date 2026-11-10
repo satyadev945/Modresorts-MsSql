@@ -1,13 +1,16 @@
 package com.acme.modres.mbean.reservation;
 
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 
 import com.acme.modres.Constants;
 
 public class DateChecker implements Runnable {
+  private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern(Constants.DATA_FORMAT);
   ReservationCheckerData data;
   List<Reservation> reservations;
 
@@ -19,16 +22,16 @@ public class DateChecker implements Runnable {
   public void run() {
     for (int i = 0; i < reservations.size(); i++) {
       Reservation reservation = reservations.get(i);
-      Date selectedDate = data.getSelectedDate();
+      Instant selectedDate = data.getSelectedDate();
 
       try {
-        Date fromDate = new SimpleDateFormat(Constants.DATA_FORMAT).parse(reservation.getFromDate());
-        Date toDate = new SimpleDateFormat(Constants.DATA_FORMAT).parse(reservation.getToDate());
-        if (selectedDate.after(fromDate) && selectedDate.before(toDate)) {
+        Instant fromDate = LocalDate.parse(reservation.getFromDate(), formatter).atStartOfDay(ZoneOffset.UTC).toInstant();
+        Instant toDate = LocalDate.parse(reservation.getToDate(), formatter).atStartOfDay(ZoneOffset.UTC).toInstant();
+        if (selectedDate.isAfter(fromDate) && selectedDate.isBefore(toDate)) {
           data.setAvailablility(false);
           break;
         }
-      } catch (ParseException ex) {
+      } catch (DateTimeParseException ex) {
         ex.printStackTrace();
       }
     }
