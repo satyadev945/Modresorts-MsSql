@@ -1,13 +1,16 @@
 package com.acme.modres.mbean.reservation;
 
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 
 import com.acme.modres.Constants;
 
 public class ReservationCheckerData {
   private ReservationList reservations;
-  private Date selectedDate;
+  private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern(Constants.DATA_FORMAT);
+  private Instant selectedDate;
   private boolean available; // changed from Boolean to boolean
 
   public ReservationCheckerData(ReservationList reservations) {
@@ -19,13 +22,18 @@ public class ReservationCheckerData {
     return reservations;
   }
 
-  public Date getSelectedDate() {
+  /** Parses a date string (Constants.DATA_FORMAT) as the start of day in UTC. */
+  public static Instant parseDate(String dateStr) {
+    return LocalDate.parse(dateStr, DATE_FORMATTER).atStartOfDay(ZoneOffset.UTC).toInstant();
+  }
+
+  public Instant getSelectedDate() {
     return selectedDate;
   }
 
   public boolean setSelectedDate(String dateStr) {
     try {
-      selectedDate = new SimpleDateFormat(Constants.DATA_FORMAT).parse(dateStr);
+      selectedDate = parseDate(dateStr);
     } catch (Exception e) {
       return false;
     }
