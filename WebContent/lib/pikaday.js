@@ -8,11 +8,39 @@
 {
     'use strict';
 
+    // Structured error reporting: emits JSON logs (collected by CloudWatch Logs / RUM) and
+    // forwards to an optional application hook (window.reportClientError) that can relay
+    // unrecoverable errors to a backend endpoint (CloudWatch Metrics + SQS DLQ).
+    function reportOptionalDependencyError(component, err)
+    {
+        var entry = {
+            level: 'WARN',
+            timestamp: new Date().toISOString(),
+            source: 'pikaday',
+            component: component,
+            message: 'Optional dependency could not be loaded',
+            error: err && err.message ? err.message : String(err),
+            metric: 'PikadayOptionalDependencyLoadFailure'
+        };
+        try {
+            if (typeof console !== 'undefined' && console.warn) {
+                console.warn(JSON.stringify(entry));
+            }
+            if (typeof window !== 'undefined' && typeof window.reportClientError === 'function') {
+                window.reportClientError(entry);
+            }
+        } catch (loggingError) {
+            if (typeof console !== 'undefined' && console.error) {
+                console.error('pikaday: failed to report error', loggingError);
+            }
+        }
+    }
+
     var moment;
     if (typeof exports === 'object') {
         // CommonJS module
         // Load moment.js as an optional dependency
-        try { moment = require('moment'); } catch (e) {}
+        try { moment = require('moment'); } catch (e) { reportOptionalDependencyError('commonjs-moment', e); }
         module.exports = factory(moment);
     } else if (typeof define === 'function' && define.amd) {
         // AMD. Register as an anonymous module.
@@ -20,7 +48,7 @@
         {
             // Load moment.js as an optional dependency
             var id = 'moment';
-            try { moment = req(id); } catch (e) {}
+            try { moment = req(id); } catch (e) { reportOptionalDependencyError('amd-moment', e); }
             return factory(moment);
         });
     } else {

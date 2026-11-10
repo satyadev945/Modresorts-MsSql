@@ -1,8 +1,8 @@
 package com.acme.modres.db;
 
-import javax.annotation.Resource;
-import javax.ejb.Singleton;
-import javax.ejb.Startup;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -10,13 +10,12 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 
-@Singleton
-@Startup
+@Service
 public class ModResortsCustomerInformation {
   private static final String SELECT_CUSTOMERS_QUERY = "SELECT INFO FROM CUSTOMER";
 
-  // Removing DB connection for ease of demo setup
-  // @Resource(lookup = "jdbc/ModResortsJndi")
+  // DataSource (e.g. HikariCP pointing at AWS RDS) is supplied by Spring; optional for demo setup
+  @Autowired(required = false)
   private DataSource dataSource;
 
   public ArrayList<String> getCustomerInformation() {

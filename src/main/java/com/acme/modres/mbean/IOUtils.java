@@ -1,70 +1,63 @@
 package com.acme.modres.mbean;
 
-import java.io.File;
-import java.io.FileOutputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.nio.charset.StandardCharsets;
 
 import com.acme.modres.mbean.reservation.ReservationList;
-import com.acme.modres.util.JsonInputStream;
+import com.acme.modres.util.S3StorageUtil;
+import com.google.gson.Gson;
 
 public final class IOUtils {
 
-  public static File getFileFromRelativePath(String path) {
-    File file = null;
-    InputStream initialStream = null;
-    OutputStream outStream = null;
-    try {
-      initialStream = IOUtils.class.getClassLoader().getResourceAsStream(path);
-      byte[] buffer = new byte[initialStream.available()];
-      initialStream.read(buffer);
-
-      file = File.createTempFile(path, null);
-      outStream = new FileOutputStream(file);
-      outStream.write(buffer);
-      outStream.close();
-    } catch (Exception e) {
-      e.printStackTrace();
-    } finally {
-      if (initialStream != null) {
-        try {
-          initialStream.close();
-        } catch (IOException e) {
-        }
-      } else if (outStream != null) {
-        try {
-          outStream.close();
-        } catch (IOException e) {
-        }
+  /**
+   * Reads a configuration resource fully into memory. When S3_BUCKET_NAME is set the
+   * object is read from Amazon S3; otherwise the bundled classpath resource is used.
+   * No local file system writes (e.g. temp files) are performed.
+   */
+  public static byte[] getResourceBytes(String path) throws IOException {
+    if (S3StorageUtil.isConfigured()) {
+      try {
+        return S3StorageUtil.getObjectBytes(path);
+      } catch (RuntimeException e) {
+        // fall back to the bundled classpath resource if the object is not available in S3
+        e.printStackTrace();
       }
     }
+    try (InputStream is = IOUtils.class.getClassLoader().getResourceAsStream(path)) {
+      if (is == null) {
+        throw new FileNotFoundException(path);
+      }
+      ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+      byte[] chunk = new byte[4096];
+      int read;
+      while ((read = is.read(chunk)) >= 0) {
+        buffer.write(chunk, 0, read);
+      }
+      return buffer.toByteArray();
+    }
+  }
 
-    return file;
+  private static Object parseJsonResource(String path, Class<?> cls) {
+    try (Reader reader = new InputStreamReader(new java.io.ByteArrayInputStream(getResourceBytes(path)),
+        StandardCharsets.UTF_8)) {
+      return new Gson().fromJson(reader, cls);
+    } catch (Exception e) {
+      e.printStackTrace();
+      return null;
+    }
   }
 
   public static OpMetadataList getOpListFromConfig() {
-    File file = getFileFromRelativePath("ops.json"); // fix hardcoded paths
-    try (JsonInputStream is = new JsonInputStream(file)) {
-      OpMetadataList opList = new OpMetadataList(); // empty default
-      opList = (OpMetadataList) is.parseJsonAs(OpMetadataList.class);
-      return opList;
-    } catch (IOException e) {
-      e.printStackTrace();
-      return null;
-    }
+    return (OpMetadataList) parseJsonResource("ops.json", OpMetadataList.class);
   }
 
   public static ReservationList getReservationListFromConfig() {
-    File file = getFileFromRelativePath("reservations.json"); // fix hardcoded paths
-    try (JsonInputStream is = new JsonInputStream(file)) {
-      ReservationList reservationList = new ReservationList(); // empty default
-      reservationList = (ReservationList) is.parseJsonAs(ReservationList.class);
-      return reservationList;
-    } catch (IOException e) {
-      e.printStackTrace();
-      return null;
-    }
+    return (ReservationList) parseJsonResource("reservations.json", ReservationList.class);
   }
 
 }

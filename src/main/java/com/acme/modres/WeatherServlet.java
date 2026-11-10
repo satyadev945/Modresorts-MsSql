@@ -39,6 +39,14 @@ import javax.naming.InitialContext;
 import javax.naming.NamingException;
 import javax.servlet.annotation.WebServlet;
 
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+
+import software.amazon.awssdk.services.secretsmanager.SecretsManagerClient;
+import software.amazon.awssdk.services.secretsmanager.model.GetSecretValueRequest;
+import software.amazon.awssdk.services.secretsmanager.model.GetSecretValueResponse;
+
 @WebServlet({ "/resorts/weather" })
 public class WeatherServlet extends HttpServlet {
   private static final long serialVersionUID = 1L;
@@ -46,10 +54,13 @@ public class WeatherServlet extends HttpServlet {
   @Inject
   private ModResortsCustomerInformation customerInfo;
 
-  // local OS environment variable key name. The key value should provide an API
-  // key that will be used to
-  // get weather information from site: http://www.wunderground.com
+  // Name of the JSON field (inside the AWS Secrets Manager secret) holding the
+  // API key used to get weather information from site: http://www.wunderground.com
   private static final String WEATHER_API_KEY = "WEATHER_API_KEY";
+
+  // Environment variable holding the AWS Secrets Manager secret name/ARN that stores the API key.
+  // No secret value is kept in source code or property files.
+  private static final String WEATHER_API_SECRET_ID_ENV = "WEATHER_API_KEY_SECRET_ID";
 
   private static final Logger logger = Logger.getLogger(WeatherServlet.class.getName());
 
@@ -106,7 +117,7 @@ public class WeatherServlet extends HttpServlet {
     String city = request.getParameter("selectedCity");
     logger.log(Level.FINE, "requested city is " + city);
 
-    String weatherAPIKey = System.getenv(WEATHER_API_KEY);
+    String weatherAPIKey = getWeatherApiKey();
     String mockedKey = mockKey(weatherAPIKey);
     logger.log(Level.FINE, "weatherAPIKey is " + mockedKey);
 
@@ -241,9 +252,43 @@ public class WeatherServlet extends HttpServlet {
     doGet(request, response);
   }
 
+  /**
+   * Retrieves the weather API key from AWS Secrets Manager. The secret id is supplied through
+   * the WEATHER_API_KEY_SECRET_ID environment variable. The secret may be a plain string or a
+   * JSON document containing a WEATHER_API_KEY field. Returns null if unavailable.
+   */
+  private static String getWeatherApiKey() {
+    String secretId = System.getenv(WEATHER_API_SECRET_ID_ENV);
+    if (secretId == null || secretId.trim().isEmpty()) {
+      logger.log(Level.FINE, WEATHER_API_SECRET_ID_ENV + " is not set; no weather API key available");
+      return null;
+    }
+    try (SecretsManagerClient client = SecretsManagerClient.create()) {
+      GetSecretValueResponse result = client.getSecretValue(
+          GetSecretValueRequest.builder().secretId(secretId.trim()).build());
+      String secret = result.secretString();
+      if (secret == null) {
+        return null;
+      }
+      String trimmed = secret.trim();
+      if (trimmed.startsWith("{")) {
+        JsonObject json = JsonParser.parseString(trimmed).getAsJsonObject();
+        JsonElement value = json.get(WEATHER_API_KEY);
+        return (value == null || value.isJsonNull()) ? null : value.getAsString();
+      }
+      return trimmed;
+    } catch (Exception e) {
+      logger.log(Level.WARNING, "Unable to retrieve weather API key from AWS Secrets Manager: " + e.getMessage());
+      return null;
+    }
+  }
+
   private static String mockKey(String toBeMocked) {
     if (toBeMocked == null) {
       return null;
+    }
+    if (toBeMocked.length() < 3) {
+      return "*********";
     }
     String lastToKeep = toBeMocked.substring(toBeMocked.length() - 3);
     return "*********" + lastToKeep;
