@@ -17,6 +17,7 @@ public final class IOUtils {
    * (e.g. temp files) are performed, so this is safe on ephemeral/read-only
    * container file systems.
    */
+  // byte[] is compatible with PostgreSQL BYTEA (setBytes/getBytes); use Types.BINARY if a JDBC type is needed
   public static byte[] getBytesFromClasspath(String path) throws IOException {
     try (InputStream in = IOUtils.class.getClassLoader().getResourceAsStream(path)) {
       if (in == null) {

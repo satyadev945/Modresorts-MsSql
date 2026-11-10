@@ -7,6 +7,7 @@ import java.time.format.DateTimeFormatter;
 
 import com.acme.modres.Constants;
 
+// Dates use java.time (LocalDate/Instant); compatible with PostgreSQL DATE/TIMESTAMPTZ.
 public class ReservationCheckerData {
   private ReservationList reservations;
   private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern(Constants.DATA_FORMAT);

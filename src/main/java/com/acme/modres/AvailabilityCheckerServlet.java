@@ -113,7 +113,7 @@ public class AvailabilityCheckerServlet extends HttpServlet {
     }
 
     try {
-      // build the zip in memory (no local file system dependency)
+      // build the zip in memory (no local file system dependency); byte[] maps to PostgreSQL BYTEA if persisted (setBytes/getBytes)
       ByteArrayOutputStream baos = new ByteArrayOutputStream();
       try (ZipOutputStream zipOut = new ZipOutputStream(baos)) {
         ZipEntry zipEntry = new ZipEntry(entryName);
