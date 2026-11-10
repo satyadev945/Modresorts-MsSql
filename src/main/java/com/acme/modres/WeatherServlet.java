@@ -13,7 +13,6 @@ import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.ProtocolException;
 import java.net.URL;
-import java.util.Hashtable;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -35,8 +34,6 @@ import javax.management.NotCompliantMBeanException;
 import javax.management.ObjectInstance;
 import javax.management.ObjectName;
 import javax.management.ReflectionException;
-import javax.naming.InitialContext;
-import javax.naming.NamingException;
 import javax.servlet.annotation.WebServlet;
 
 @WebServlet({ "/resorts/weather" })
@@ -53,11 +50,12 @@ public class WeatherServlet extends HttpServlet {
 
   private static final Logger logger = Logger.getLogger(WeatherServlet.class.getName());
 
-  private static InitialContext context;
-
-  MBeanServer server;
-  ObjectName weatherON;
-  ObjectInstance mbean;
+  // JMX registration is local to this container instance (pod); it holds no shared
+  // state, so replicas can be scaled independently. Durable/shared state must be
+  // externalized (e.g. Azure Cache for Redis / database) rather than kept in these fields.
+  private MBeanServer server;
+  private ObjectName weatherON;
+  private ObjectInstance mbean;
 
   @Override
   public void init() {
@@ -75,7 +73,6 @@ public class WeatherServlet extends HttpServlet {
     } catch (InstanceAlreadyExistsException | MBeanRegistrationException | NotCompliantMBeanException e) {
       e.printStackTrace();
     }
-    context = setInitialContextProps();
   }
 
   @Override
@@ -253,26 +250,15 @@ public class WeatherServlet extends HttpServlet {
 
     String serverEnv = "";
 
-    serverEnv += com.ibm.websphere.runtime.ServerName.getDisplayName();
-    serverEnv += com.ibm.websphere.runtime.ServerName.getFullName();
+    String serverName = System.getenv("SERVER_NAME");
+    if (serverName == null || serverName.isEmpty()) {
+      serverName = System.getenv("HOSTNAME");
+    }
+    if (serverName == null || serverName.isEmpty()) {
+      serverName = "localhost";
+    }
+    serverEnv += serverName;
 
     return serverEnv;
-  }
-
-  private InitialContext setInitialContextProps() {
-
-    Hashtable ht = new Hashtable();
-
-    ht.put("java.naming.factory.initial", "com.ibm.websphere.naming.WsnInitialContextFactory");
-    ht.put("java.naming.provider.url", "corbaloc:iiop:localhost:2809");
-
-    InitialContext ctx = null;
-    try {
-      ctx = new InitialContext(ht);
-    } catch (NamingException e) {
-      e.printStackTrace();
-    }
-
-    return ctx;
   }
 }
