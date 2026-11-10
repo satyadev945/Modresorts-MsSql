@@ -1,0 +1,29 @@
+version: "3.8"
+
+services:
+  modresorts:
+    image: modresorts:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: modresorts
+    ports:
+      - "8080:8080"
+    environment:
+      TZ: "UTC"
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dfile.encoding=UTF-8 -Duser.timezone=UTC"
+      WEATHER_API_KEY: "${WEATHER_API_KEY:-}"
+      SERVER_NAME: "${SERVER_NAME:-localhost}"
+    volumes:
+      - ./config:/opt/tomcat/conf/Catalina/localhost:ro
+      - app-logs:/opt/tomcat/logs
+    networks:
+      - app-network
+    restart: unless-stopped
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  app-logs:
