@@ -1,0 +1,29 @@
+version: "3.8"
+
+services:
+  modresorts:
+    image: modresorts:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: modresorts
+    ports:
+      - "9080:9080"
+    environment:
+      TZ: "UTC"
+      ENABLE_JMX_APPINFO: "${ENABLE_JMX_APPINFO:-true}"
+      WEATHER_API_KEY: "${WEATHER_API_KEY:-}"
+      SERVER_NAME: "${SERVER_NAME:-modresorts-local}"
+      JVM_ARGS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Xms256m -Dfile.encoding=UTF-8 -Duser.timezone=UTC"
+    volumes:
+      - app-logs:/opt/ol/wlp/usr/servers/defaultServer/logs
+    networks:
+      - app-network
+    restart: unless-stopped
+
+volumes:
+  app-logs:
+
+networks:
+  app-network:
+    driver: bridge

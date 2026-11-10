@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<server description="ModResorts">
+
+  <featureManager>
+    <feature>javaee-7.0</feature>
+  </featureManager>
+
+  <!-- Plain HTTP on 9080; TLS is terminated at the ingress -->
+  <httpEndpoint id="defaultHttpEndpoint" host="*" httpPort="9080" />
+
+  <applicationManager autoExpand="true" />
+
+  <webApplication id="modresorts" name="modresorts" location="modresorts.war" contextRoot="/" />
+
+  <logging consoleLogLevel="INFO" messageFormat="simple" />
+</server>
