@@ -9,10 +9,38 @@
     'use strict';
 
     var moment;
+
+    // Structured error reporting: emits JSON log entries (collected by CloudWatch RUM / Logs
+    // agents) and forwards to an optional application-provided reporter, which can relay
+    // unrecoverable errors to a backend endpoint (CloudWatch Metrics / SQS DLQ).
+    function reportError(operation, err)
+    {
+        var entry = {
+            level: 'WARN',
+            component: 'pikaday',
+            operation: operation,
+            message: (err && err.message) ? err.message : String(err),
+            timestamp: new Date().toISOString()
+        };
+        try {
+            if (typeof console !== 'undefined' && console.warn) {
+                console.warn(JSON.stringify(entry));
+            }
+            if (typeof window !== 'undefined' && typeof window.cloudErrorReporter === 'function') {
+                window.cloudErrorReporter(entry);
+            }
+        } catch (reportErr) {
+            // reporting must never break the caller
+            if (typeof console !== 'undefined' && console.error) {
+                console.error('pikaday: failed to report error', reportErr);
+            }
+        }
+    }
+
     if (typeof exports === 'object') {
         // CommonJS module
         // Load moment.js as an optional dependency
-        try { moment = require('moment'); } catch (e) {}
+        try { moment = require('moment'); } catch (e) { reportError('require-moment', e); }
         module.exports = factory(moment);
     } else if (typeof define === 'function' && define.amd) {
         // AMD. Register as an anonymous module.
@@ -20,7 +48,7 @@
         {
             // Load moment.js as an optional dependency
             var id = 'moment';
-            try { moment = req(id); } catch (e) {}
+            try { moment = req(id); } catch (e) { reportError('amd-require-moment', e); }
             return factory(moment);
         });
     } else {
