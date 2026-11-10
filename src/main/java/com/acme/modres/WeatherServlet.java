@@ -121,6 +121,7 @@ public class WeatherServlet extends HttpServlet {
       throws ServletException, IOException {
     String resturl = null;
     String resturlbase = Constants.WUNDERGROUND_API_PREFIX + apiKey + Constants.WUNDERGROUND_API_PART;
+    // Note: these are REST URLs for the weather API, not SQL Server JDBC settings; no PostgreSQL change applies.
 
     if (Constants.PARIS.equals(city)) {
       resturl = resturlbase + "France/Paris.json";
