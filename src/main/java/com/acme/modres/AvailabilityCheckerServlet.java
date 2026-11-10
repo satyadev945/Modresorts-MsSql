@@ -113,6 +113,7 @@ public class AvailabilityCheckerServlet extends HttpServlet {
       ZipEntry zipEntry = new ZipEntry(fileToZip.getName());
       zipOut.putNextEntry(zipEntry);
 
+      // In-memory zip buffer only; if persisted to PostgreSQL use BYTEA (setBytes/getBytes)
       byte[] bytes = new byte[1024];
       int length;
       while ((length = fis.read(bytes)) >= 0) {

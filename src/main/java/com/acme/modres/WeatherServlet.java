@@ -122,6 +122,7 @@ public class WeatherServlet extends HttpServlet {
     }
   }
 
+  // Note: REST URLs below are weather API endpoints, not database/JDBC configuration; no SQL Server settings apply.
   private void getRealTimeWeatherData(String city, String apiKey, HttpServletResponse response)
       throws ServletException, IOException {
     String resturl = null;
