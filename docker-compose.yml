@@ -1,0 +1,32 @@
+version: "3.8"
+
+services:
+  modresorts:
+    image: modresorts:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: modresorts
+    ports:
+      - "8080:8080"
+    environment:
+      - TZ=UTC
+      - SERVER_PORT=8080
+      - SPRING_PROFILES_ACTIVE=docker
+      - JAVA_OPTS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Xms256m
+      # Optional external service configuration (set in shell or .env file)
+      - WEATHER_SERVICE_URL=${WEATHER_SERVICE_URL:-}
+      - WEATHER_API_KEY=${WEATHER_API_KEY:-}
+    volumes:
+      - ./config:/app/config
+      - app-data:/home/appuser
+    networks:
+      - app-network
+    restart: unless-stopped
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  app-data:
