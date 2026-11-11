@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: modresorts
+  namespace: {{NAMESPACE}}
+  labels:
+    app: modresorts
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: modresorts
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: modresorts
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: modresorts
+          image: {{IMAGE_URI}}
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: TZ
+              value: "UTC"
+            - name: WEATHER_API_KEY
+              value: "{{WEATHER_API_KEY}}"
+            - name: JNDI_INITIAL_CONTEXT_FACTORY
+              value: "{{JNDI_INITIAL_CONTEXT_FACTORY}}"
+            - name: JNDI_PROVIDER_URL
+              value: "{{JNDI_PROVIDER_URL}}"
+            - name: SERVER_DISPLAY_NAME
+              value: "{{SERVER_DISPLAY_NAME}}"
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "500m"
+              memory: "1Gi"
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 5
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3

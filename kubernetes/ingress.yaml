@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: modresorts-ingress
+  namespace: {{NAMESPACE}}
+  labels:
+    app: modresorts
+  annotations:
+    kubernetes.io/ingress.class: gce
+spec:
+  rules:
+    - host: {{INGRESS_HOST}}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: modresorts-service
+                port:
+                  number: 80

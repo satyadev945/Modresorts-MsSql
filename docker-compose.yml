@@ -1,0 +1,28 @@
+version: "3.8"
+
+services:
+  modresorts:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: modresorts:latest
+    container_name: modresorts
+    ports:
+      - "8080:8080"
+    environment:
+      TZ: "UTC"
+      # External service configuration (supply via shell env or .env file)
+      WEATHER_API_KEY: "${WEATHER_API_KEY:-}"
+      WEATHER_API_KEY_FILE: "${WEATHER_API_KEY_FILE:-}"
+      JNDI_INITIAL_CONTEXT_FACTORY: "${JNDI_INITIAL_CONTEXT_FACTORY:-}"
+      JNDI_PROVIDER_URL: "${JNDI_PROVIDER_URL:-}"
+      SERVER_DISPLAY_NAME: "${SERVER_DISPLAY_NAME:-modresorts-local}"
+    volumes:
+      - ./config:/config:ro
+    networks:
+      - app-network
+    restart: unless-stopped
+
+networks:
+  app-network:
+    driver: bridge
