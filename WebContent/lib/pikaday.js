@@ -8,11 +8,33 @@
 {
     'use strict';
 
+    // Structured error reporting (picked up by CloudWatch Logs / RUM when available).
+    // Optional-dependency failures are recoverable, so they are logged rather than forwarded to a DLQ.
+    function reportError(source, err)
+    {
+        var entry = {
+            level: 'WARN',
+            component: 'pikaday',
+            source: source,
+            message: (err && err.message) ? err.message : String(err),
+            timestamp: new Date().toISOString()
+        };
+        try {
+            if (typeof console !== 'undefined' && console.warn) {
+                console.warn(JSON.stringify(entry));
+            }
+            // Optional hook: CloudWatch RUM / custom metric emitter (e.g. forwards to CloudWatch Metrics, SQS DLQ via backend)
+            if (root && typeof root.reportClientError === 'function') {
+                root.reportClientError(entry);
+            }
+        } catch (ignore) { /* reporting must never break the page */ }
+    }
+
     var moment;
     if (typeof exports === 'object') {
         // CommonJS module
         // Load moment.js as an optional dependency
-        try { moment = require('moment'); } catch (e) {}
+        try { moment = require('moment'); } catch (e) { reportError('require(moment)', e); }
         module.exports = factory(moment);
     } else if (typeof define === 'function' && define.amd) {
         // AMD. Register as an anonymous module.
@@ -20,7 +42,7 @@
         {
             // Load moment.js as an optional dependency
             var id = 'moment';
-            try { moment = req(id); } catch (e) {}
+            try { moment = req(id); } catch (e) { reportError('amd(moment)', e); }
             return factory(moment);
         });
     } else {

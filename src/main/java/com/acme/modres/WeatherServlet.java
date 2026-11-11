@@ -3,6 +3,7 @@ package com.acme.modres;
 import com.acme.modres.db.ModResortsCustomerInformation;
 import com.acme.modres.exception.ExceptionHandler;
 import com.acme.modres.mbean.AppInfo;
+import com.acme.modres.util.SecretsManagerHelper;
 
 import java.io.BufferedReader;
 
@@ -46,10 +47,11 @@ public class WeatherServlet extends HttpServlet {
   @Inject
   private ModResortsCustomerInformation customerInfo;
 
-  // local OS environment variable key name. The key value should provide an API
-  // key that will be used to
-  // get weather information from site: http://www.wunderground.com
-  private static final String WEATHER_API_KEY = "WEATHER_API_KEY";
+  // Name of the environment variable holding the AWS Secrets Manager secret name
+  // (not the secret itself). The secret value is the API key used to get weather
+  // information from site: http://www.wunderground.com
+  private static final String WEATHER_API_KEY_SECRET_NAME = "WEATHER_API_KEY_SECRET_NAME";
+  private static final String DEFAULT_WEATHER_API_KEY_SECRET = "modresorts/weather-api-key";
 
   private static final Logger logger = Logger.getLogger(WeatherServlet.class.getName());
 
@@ -106,7 +108,7 @@ public class WeatherServlet extends HttpServlet {
     String city = request.getParameter("selectedCity");
     logger.log(Level.FINE, "requested city is " + city);
 
-    String weatherAPIKey = System.getenv(WEATHER_API_KEY);
+    String weatherAPIKey = resolveWeatherApiKey();
     String mockedKey = mockKey(weatherAPIKey);
     logger.log(Level.FINE, "weatherAPIKey is " + mockedKey);
 
@@ -118,6 +120,14 @@ public class WeatherServlet extends HttpServlet {
           "weatherAPIKey is not found, will provide the weather data dated August 10th, 2018 for the city " + city);
       getDefaultWeatherData(city, response);
     }
+  }
+
+  private String resolveWeatherApiKey() {
+    String secretName = System.getenv(WEATHER_API_KEY_SECRET_NAME);
+    if (secretName == null || secretName.trim().isEmpty()) {
+      secretName = DEFAULT_WEATHER_API_KEY_SECRET;
+    }
+    return SecretsManagerHelper.getSecret(secretName);
   }
 
   private void getRealTimeWeatherData(String city, String apiKey, HttpServletResponse response)
