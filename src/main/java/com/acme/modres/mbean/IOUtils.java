@@ -17,6 +17,7 @@ public final class IOUtils {
     OutputStream outStream = null;
     try {
       initialStream = IOUtils.class.getClassLoader().getResourceAsStream(path);
+      // In-memory file buffer only; not a database column (PostgreSQL BYTEA would map to byte[] via getBytes()/setBytes()).
       byte[] buffer = new byte[initialStream.available()];
       initialStream.read(buffer);
 
