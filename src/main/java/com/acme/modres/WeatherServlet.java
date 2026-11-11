@@ -51,6 +51,11 @@ public class WeatherServlet extends HttpServlet {
   // get weather information from site: http://www.wunderground.com
   private static final String WEATHER_API_KEY = "WEATHER_API_KEY";
 
+  // Optional env var pointing to an independently deployed weather microservice
+  // (e.g. http://weather-service:8080/weather in Kubernetes/EKS service DNS).
+  // When set, weather requests are delegated to it instead of being handled in-process.
+  private static final String WEATHER_SERVICE_URL = "WEATHER_SERVICE_URL";
+
   private static final Logger logger = Logger.getLogger(WeatherServlet.class.getName());
 
   private static InitialContext context;
@@ -106,6 +111,13 @@ public class WeatherServlet extends HttpServlet {
     String city = request.getParameter("selectedCity");
     logger.log(Level.FINE, "requested city is " + city);
 
+    String weatherServiceUrl = System.getenv(WEATHER_SERVICE_URL);
+    if (weatherServiceUrl != null && weatherServiceUrl.trim().length() > 0) {
+      logger.info("WEATHER_SERVICE_URL is set, delegating weather request for city " + city);
+      getRemoteWeatherData(city, weatherServiceUrl.trim(), response);
+      return;
+    }
+
     String weatherAPIKey = System.getenv(WEATHER_API_KEY);
     String mockedKey = mockKey(weatherAPIKey);
     logger.log(Level.FINE, "weatherAPIKey is " + mockedKey);
@@ -117,6 +129,31 @@ public class WeatherServlet extends HttpServlet {
       logger.info(
           "weatherAPIKey is not found, will provide the weather data dated August 10th, 2018 for the city " + city);
       getDefaultWeatherData(city, response);
+    }
+  }
+
+  private void getRemoteWeatherData(String city, String serviceUrl, HttpServletResponse response)
+      throws ServletException, IOException {
+    String separator = serviceUrl.contains("?") ? "&" : "?";
+    HttpURLConnection con = (HttpURLConnection) new URL(
+        serviceUrl + separator + "selectedCity=" + java.net.URLEncoder.encode(city == null ? "" : city, "UTF-8"))
+        .openConnection();
+    con.setRequestMethod("GET");
+    int responseCode = con.getResponseCode();
+    if (responseCode >= 200 && responseCode < 300) {
+      try (BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream()));
+          ServletOutputStream out = response.getOutputStream()) {
+        StringBuilder responseStr = new StringBuilder();
+        String inputLine;
+        while ((inputLine = in.readLine()) != null) {
+          responseStr.append(inputLine);
+        }
+        response.setContentType("application/json");
+        out.print(responseStr.toString());
+      }
+    } else {
+      ExceptionHandler.handleException(null,
+          "Weather service " + serviceUrl + " returned an error response: " + responseCode, logger);
     }
   }
 
@@ -253,8 +290,10 @@ public class WeatherServlet extends HttpServlet {
 
     String serverEnv = "";
 
-    serverEnv += com.ibm.websphere.runtime.ServerName.getDisplayName();
-    serverEnv += com.ibm.websphere.runtime.ServerName.getFullName();
+    String serverName = System.getenv("SERVER_NAME");
+    String hostName = System.getenv("HOSTNAME");
+    serverEnv += (serverName != null) ? serverName : "";
+    serverEnv += (hostName != null) ? hostName : "";
 
     return serverEnv;
   }
@@ -263,8 +302,18 @@ public class WeatherServlet extends HttpServlet {
 
     Hashtable ht = new Hashtable();
 
-    ht.put("java.naming.factory.initial", "com.ibm.websphere.naming.WsnInitialContextFactory");
-    ht.put("java.naming.provider.url", "corbaloc:iiop:localhost:2809");
+    String jndiFactory = System.getenv("JNDI_INITIAL_CONTEXT_FACTORY");
+    if (jndiFactory != null && !jndiFactory.isEmpty()) {
+      ht.put("java.naming.factory.initial", jndiFactory);
+    }
+    // Provider URL is externalized (no hardcoded RMI/IIOP registry); in Kubernetes
+    // use service DNS-based discovery (e.g. REST/gRPC endpoints) instead of RMI lookups.
+    String jndiProviderUrl = System.getenv("JNDI_PROVIDER_URL");
+    if (jndiProviderUrl == null || jndiProviderUrl.isEmpty()) {
+      logger.info("JNDI_PROVIDER_URL not set; skipping remote JNDI/RMI context initialization");
+      return null;
+    }
+    ht.put("java.naming.provider.url", jndiProviderUrl);
 
     InitialContext ctx = null;
     try {

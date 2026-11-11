@@ -1,8 +1,7 @@
 package com.acme.modres.db;
 
 import javax.annotation.Resource;
-import javax.ejb.Singleton;
-import javax.ejb.Startup;
+import javax.ejb.Stateless;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -10,8 +9,10 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 
-@Singleton
-@Startup
+// Stateless (pooled) bean instead of a @Singleton: no instance-level state is held in the
+// JVM, so every container replica behaves identically. Any shared state must be kept in an
+// external store (e.g. Redis/ElastiCache configured via REDIS_HOST/REDIS_PORT env vars).
+@Stateless
 public class ModResortsCustomerInformation {
   private static final String SELECT_CUSTOMERS_QUERY = "SELECT INFO FROM CUSTOMER";
 
