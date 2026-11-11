@@ -24,4 +24,10 @@ public class Constants {
 
   public final static String DATA_FORMAT = "MM/dd/yyyy";
 
+  // calculator endpoint path and request parameter names
+  public final static String CALCULATE_PATH = "/resorts/calculate";
+  public final static String PARAM_A = "a";
+  public final static String PARAM_B = "b";
+  public final static String PARAM_OP = "op";
+
 }
