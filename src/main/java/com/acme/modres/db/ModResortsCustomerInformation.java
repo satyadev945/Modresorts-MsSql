@@ -1,8 +1,5 @@
 package com.acme.modres.db;
 
-import javax.annotation.Resource;
-import javax.ejb.Singleton;
-import javax.ejb.Startup;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -10,8 +7,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 
-@Singleton
-@Startup
+// Stateless (not a JVM-local singleton) so every container replica behaves identically;
+// any shared state must be externalized (e.g. Azure Cache for Redis via env-provided connection string).
 public class ModResortsCustomerInformation {
   private static final String SELECT_CUSTOMERS_QUERY = "SELECT INFO FROM CUSTOMER";
 
