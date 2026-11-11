@@ -13,7 +13,6 @@ import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.ProtocolException;
 import java.net.URL;
-import java.util.Hashtable;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -35,8 +34,6 @@ import javax.management.NotCompliantMBeanException;
 import javax.management.ObjectInstance;
 import javax.management.ObjectName;
 import javax.management.ReflectionException;
-import javax.naming.InitialContext;
-import javax.naming.NamingException;
 import javax.servlet.annotation.WebServlet;
 
 @WebServlet({ "/resorts/weather" })
@@ -53,7 +50,11 @@ public class WeatherServlet extends HttpServlet {
 
   private static final Logger logger = Logger.getLogger(WeatherServlet.class.getName());
 
-  private static InitialContext context;
+  // Loose coupling: the remote (separately deployed) service is addressed by an externally
+  // supplied target (env REMOTE_SERVICE_GRPC_TARGET, e.g. a GKE Kubernetes Service DNS name
+  // injected via ConfigMap / Secret Manager with Workload Identity) rather than an in-process
+  // component reference.
+  private static volatile String remoteServiceTarget;
 
   MBeanServer server;
   ObjectName weatherON;
@@ -75,7 +76,7 @@ public class WeatherServlet extends HttpServlet {
     } catch (InstanceAlreadyExistsException | MBeanRegistrationException | NotCompliantMBeanException e) {
       e.printStackTrace();
     }
-    context = setInitialContextProps();
+    remoteServiceTarget = resolveRemoteServiceTarget();
   }
 
   @Override
@@ -253,26 +254,28 @@ public class WeatherServlet extends HttpServlet {
 
     String serverEnv = "";
 
-    serverEnv += com.ibm.websphere.runtime.ServerName.getDisplayName();
-    serverEnv += com.ibm.websphere.runtime.ServerName.getFullName();
+    String serverName = System.getenv("SERVER_NAME");
+    if (serverName == null || serverName.isEmpty()) {
+      serverName = System.getenv("HOSTNAME");
+    }
+    serverEnv += (serverName != null) ? serverName : "";
+    String serverFullName = System.getenv("SERVER_FULL_NAME");
+    serverEnv += (serverFullName != null) ? serverFullName : "";
 
     return serverEnv;
   }
 
-  private InitialContext setInitialContextProps() {
-
-    Hashtable ht = new Hashtable();
-
-    ht.put("java.naming.factory.initial", "com.ibm.websphere.naming.WsnInitialContextFactory");
-    ht.put("java.naming.provider.url", "corbaloc:iiop:localhost:2809");
-
-    InitialContext ctx = null;
-    try {
-      ctx = new InitialContext(ht);
-    } catch (NamingException e) {
-      e.printStackTrace();
+  /**
+   * RMI/JNDI registry lookups are not available in containers. Remote service endpoints are
+   * resolved from the environment (e.g. a gRPC target served via a Kubernetes Service on GKE,
+   * with configuration injected from Secret Manager / ConfigMap).
+   */
+  private String resolveRemoteServiceTarget() {
+    String target = System.getenv("REMOTE_SERVICE_GRPC_TARGET");
+    if (target == null || target.isEmpty()) {
+      logger.log(Level.FINE, "REMOTE_SERVICE_GRPC_TARGET not set; no remote service configured.");
+      return null;
     }
-
-    return ctx;
+    return target;
   }
 }

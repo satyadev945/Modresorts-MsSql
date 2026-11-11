@@ -22,12 +22,6 @@
       <scope>provided</scope>
     </dependency>
     <dependency>
-      <groupId>com.ibm.websphere.appserver</groupId>
-      <artifactId>was_public</artifactId>
-      <version>9.0.0</version>
-      <scope>provided</scope>
-    </dependency>
-    <dependency>
       <groupId>com.microsoft.sqlserver</groupId>
       <artifactId>mssql-jdbc</artifactId>
       <version>12.8.1.jre8</version>

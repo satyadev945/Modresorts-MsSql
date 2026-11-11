@@ -1,0 +1,36 @@
+# Cloud Build pipeline: purge unused CSS, package WAR, push to Artifact Registry (for GKE Autopilot)
+steps:
+  # 1. Remove unused CSS rules with PurgeCSS
+  - name: 'node:20-alpine'
+    id: purgecss
+    entrypoint: sh
+    args:
+      - -c
+      - |
+        npm install --no-save purgecss@6 &&
+        npx purgecss --config purgecss.config.js &&
+        cp build/purged-css/styles.css WebContent/styles.css &&
+        cp build/purged-css/pikaday.css WebContent/pikaday.css
+
+  # 2. Build the container image with the optimized static assets
+  - name: 'gcr.io/cloud-builders/docker'
+    id: build-image
+    args:
+      - build
+      - -t
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/modresorts:${SHORT_SHA}'
+      - .
+
+  # 3. Push to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    id: push-image
+    args:
+      - push
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/modresorts:${SHORT_SHA}'
+
+substitutions:
+  _REGION: us-central1
+  _REPOSITORY: modresorts
+
+images:
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/modresorts:${SHORT_SHA}'

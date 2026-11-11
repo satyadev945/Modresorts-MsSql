@@ -29,8 +29,16 @@
     </script>
 </head>
 
-
 <body>
+    <!-- noscript fallback (SSR/crawler/JS-disabled). On GKE Autopilot this fragment is sourced from GCP Secret Manager via the Secret Manager add-on + Workload Identity. -->
+    <noscript>
+        <div class="noscript-fallback" role="alert">
+            <h1>MOD RESORTS</h1>
+            <p>JavaScript is disabled or failed to load. Destination weather lookup and reservations require JavaScript.
+                Please enable JavaScript in your browser, or contact Customer Support at 1-800-867-5409.</p>
+            <p><a href="/resorts/logout">Logout</a></p>
+        </div>
+    </noscript>
     <header class="header">
         <div class="header--left-container">
             <img class="header--logo" src="images/m-logo.svg" alt="">
