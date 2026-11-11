@@ -49,7 +49,10 @@ public class WeatherServlet extends HttpServlet {
   // local OS environment variable key name. The key value should provide an API
   // key that will be used to
   // get weather information from site: http://www.wunderground.com
+  // In EKS, the key is injected from a Kubernetes ConfigMap/Secret either as this
+  // env var or as a mounted file whose path is given by WEATHER_API_KEY_FILE.
   private static final String WEATHER_API_KEY = "WEATHER_API_KEY";
+  private static final String WEATHER_API_KEY_FILE = "WEATHER_API_KEY_FILE";
 
   private static final Logger logger = Logger.getLogger(WeatherServlet.class.getName());
 
@@ -106,7 +109,7 @@ public class WeatherServlet extends HttpServlet {
     String city = request.getParameter("selectedCity");
     logger.log(Level.FINE, "requested city is " + city);
 
-    String weatherAPIKey = System.getenv(WEATHER_API_KEY);
+    String weatherAPIKey = resolveWeatherApiKey();
     String mockedKey = mockKey(weatherAPIKey);
     logger.log(Level.FINE, "weatherAPIKey is " + mockedKey);
 
@@ -241,6 +244,23 @@ public class WeatherServlet extends HttpServlet {
     doGet(request, response);
   }
 
+  private static String resolveWeatherApiKey() {
+    String key = System.getenv(WEATHER_API_KEY);
+    if (key != null && key.trim().length() > 0) {
+      return key;
+    }
+    String keyFile = System.getenv(WEATHER_API_KEY_FILE);
+    if (keyFile != null && keyFile.trim().length() > 0) {
+      try {
+        return new String(java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(keyFile)),
+            java.nio.charset.StandardCharsets.UTF_8).trim();
+      } catch (IOException e) {
+        logger.log(Level.WARNING, "Unable to read weather API key file " + keyFile, e);
+      }
+    }
+    return null;
+  }
+
   private static String mockKey(String toBeMocked) {
     if (toBeMocked == null) {
       return null;
@@ -253,8 +273,14 @@ public class WeatherServlet extends HttpServlet {
 
     String serverEnv = "";
 
-    serverEnv += com.ibm.websphere.runtime.ServerName.getDisplayName();
-    serverEnv += com.ibm.websphere.runtime.ServerName.getFullName();
+    // Portable server identification via environment variables (replaces WebSphere-specific ServerName API)
+    String serverName = System.getenv("SERVER_NAME");
+    if (serverName == null || serverName.isEmpty()) {
+      serverName = System.getenv("HOSTNAME");
+    }
+    String serverFullName = System.getenv("SERVER_FULL_NAME");
+    serverEnv += (serverName != null ? serverName : "");
+    serverEnv += (serverFullName != null ? serverFullName : "");
 
     return serverEnv;
   }
@@ -263,8 +289,15 @@ public class WeatherServlet extends HttpServlet {
 
     Hashtable ht = new Hashtable();
 
-    ht.put("java.naming.factory.initial", "com.ibm.websphere.naming.WsnInitialContextFactory");
-    ht.put("java.naming.provider.url", "corbaloc:iiop:localhost:2809");
+    // Container-portable JNDI config via environment variables (no WebSphere-specific factory)
+    String jndiFactory = System.getenv("JNDI_INITIAL_CONTEXT_FACTORY");
+    String jndiProviderUrl = System.getenv("JNDI_PROVIDER_URL");
+    if (jndiFactory != null && !jndiFactory.isEmpty()) {
+      ht.put("java.naming.factory.initial", jndiFactory);
+    }
+    if (jndiProviderUrl != null && !jndiProviderUrl.isEmpty()) {
+      ht.put("java.naming.provider.url", jndiProviderUrl);
+    }
 
     InitialContext ctx = null;
     try {
