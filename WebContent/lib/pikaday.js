@@ -8,11 +8,40 @@
 {
     'use strict';
 
+    // Structured error reporter: emits JSON logs (collected by CloudWatch RUM / Logs agents)
+    // and optionally forwards to a configurable endpoint (e.g. API Gateway -> CloudWatch Logs/Metrics, SQS DLQ).
+    function reportError(operation, err, recoverable)
+    {
+        var entry = {
+            level: recoverable ? 'WARN' : 'ERROR',
+            component: 'pikaday',
+            operation: operation,
+            errorName: err && err.name,
+            errorMessage: err && err.message,
+            recoverable: !!recoverable,
+            metric: 'PikadayModuleLoadFailure',
+            timestamp: new Date().toISOString()
+        };
+        try {
+            if (typeof console !== 'undefined') {
+                (recoverable ? console.warn : console.error).call(console, JSON.stringify(entry));
+            }
+            var endpoint = root && root.PIKADAY_ERROR_ENDPOINT;
+            if (endpoint && root.navigator && typeof root.navigator.sendBeacon === 'function') {
+                root.navigator.sendBeacon(endpoint, JSON.stringify(entry));
+            }
+        } catch (reportErr) {
+            // reporting must never break the host application
+        }
+    }
+
     var moment;
     if (typeof exports === 'object') {
         // CommonJS module
         // Load moment.js as an optional dependency
-        try { moment = require('moment'); } catch (e) {}
+        try { moment = require('moment'); } catch (e) {
+            reportError('require-moment', e, true);
+        }
         module.exports = factory(moment);
     } else if (typeof define === 'function' && define.amd) {
         // AMD. Register as an anonymous module.
@@ -20,7 +49,9 @@
         {
             // Load moment.js as an optional dependency
             var id = 'moment';
-            try { moment = req(id); } catch (e) {}
+            try { moment = req(id); } catch (e) {
+                reportError('amd-require-moment', e, true);
+            }
             return factory(moment);
         });
     } else {

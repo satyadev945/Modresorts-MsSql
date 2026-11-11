@@ -1,70 +1,65 @@
 package com.acme.modres.mbean;
 
-import java.io.File;
-import java.io.FileOutputStream;
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 
 import com.acme.modres.mbean.reservation.ReservationList;
-import com.acme.modres.util.JsonInputStream;
+import com.google.gson.Gson;
 
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+
+/**
+ * Configuration loading utilities. No local file system writes are performed:
+ * configuration is streamed directly into memory either from Amazon S3 (when
+ * CONFIG_S3_BUCKET is set) or from read-only classpath resources.
+ */
 public final class IOUtils {
 
-  public static File getFileFromRelativePath(String path) {
-    File file = null;
-    InputStream initialStream = null;
-    OutputStream outStream = null;
-    try {
-      initialStream = IOUtils.class.getClassLoader().getResourceAsStream(path);
-      byte[] buffer = new byte[initialStream.available()];
-      initialStream.read(buffer);
+  private IOUtils() {
+  }
 
-      file = File.createTempFile(path, null);
-      outStream = new FileOutputStream(file);
-      outStream.write(buffer);
-      outStream.close();
-    } catch (Exception e) {
-      e.printStackTrace();
-    } finally {
-      if (initialStream != null) {
-        try {
-          initialStream.close();
-        } catch (IOException e) {
-        }
-      } else if (outStream != null) {
-        try {
-          outStream.close();
-        } catch (IOException e) {
-        }
+  /**
+   * Opens a configuration resource. Uses Amazon S3 when CONFIG_S3_BUCKET is
+   * defined (optional CONFIG_S3_PREFIX), otherwise falls back to the classpath.
+   */
+  private static InputStream openConfigStream(String path) throws IOException {
+    String bucket = System.getenv("CONFIG_S3_BUCKET");
+    if (bucket != null && !bucket.trim().isEmpty()) {
+      String prefix = System.getenv().getOrDefault("CONFIG_S3_PREFIX", "");
+      String key = prefix + path;
+      try (S3Client s3 = S3Client.create()) {
+        byte[] data = s3.getObjectAsBytes(GetObjectRequest.builder().bucket(bucket).key(key).build())
+            .asByteArray();
+        return new java.io.ByteArrayInputStream(data);
       }
     }
+    InputStream is = IOUtils.class.getClassLoader().getResourceAsStream(path);
+    if (is == null) {
+      throw new IOException("Configuration resource not found: " + path);
+    }
+    return is;
+  }
 
-    return file;
+  private static <T> T readJson(String path, Class<T> cls) {
+    try (InputStream is = openConfigStream(path);
+        BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+      return new Gson().fromJson(reader, cls);
+    } catch (Exception e) {
+      e.printStackTrace();
+      return null;
+    }
   }
 
   public static OpMetadataList getOpListFromConfig() {
-    File file = getFileFromRelativePath("ops.json"); // fix hardcoded paths
-    try (JsonInputStream is = new JsonInputStream(file)) {
-      OpMetadataList opList = new OpMetadataList(); // empty default
-      opList = (OpMetadataList) is.parseJsonAs(OpMetadataList.class);
-      return opList;
-    } catch (IOException e) {
-      e.printStackTrace();
-      return null;
-    }
+    return readJson("ops.json", OpMetadataList.class);
   }
 
   public static ReservationList getReservationListFromConfig() {
-    File file = getFileFromRelativePath("reservations.json"); // fix hardcoded paths
-    try (JsonInputStream is = new JsonInputStream(file)) {
-      ReservationList reservationList = new ReservationList(); // empty default
-      reservationList = (ReservationList) is.parseJsonAs(ReservationList.class);
-      return reservationList;
-    } catch (IOException e) {
-      e.printStackTrace();
-      return null;
-    }
+    return readJson("reservations.json", ReservationList.class);
   }
 
 }
