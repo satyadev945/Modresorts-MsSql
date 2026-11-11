@@ -1,0 +1,26 @@
+version: "3.8"
+
+services:
+  modresorts:
+    image: modresorts:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: modresorts
+    ports:
+      - "8080:8080"
+    environment:
+      TZ: UTC
+      CATALINA_OPTS: "-Xms256m -Xmx512m -XX:MaxRAMPercentage=75.0 -Dfile.encoding=UTF-8 -Duser.timezone=UTC"
+      # External services are provided separately - configure via environment
+      REDIS_HOST: ${REDIS_HOST:-localhost}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_CACHE_TTL: ${REDIS_CACHE_TTL:-300}
+      WEATHER_API_KEY: ${WEATHER_API_KEY:-}
+    restart: unless-stopped
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
