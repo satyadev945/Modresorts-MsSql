@@ -17,6 +17,7 @@ public final class IOUtils {
     OutputStream outStream = null;
     try {
       initialStream = IOUtils.class.getClassLoader().getResourceAsStream(path);
+      // Plain file bytes (not a DB column); if persisted in PostgreSQL use BYTEA / Types.BINARY.
       byte[] buffer = new byte[initialStream.available()];
       initialStream.read(buffer);
 

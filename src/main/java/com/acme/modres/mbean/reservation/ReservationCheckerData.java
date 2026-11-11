@@ -7,6 +7,7 @@ import com.acme.modres.Constants;
 
 public class ReservationCheckerData {
   private ReservationList reservations;
+  // Date-only value (PostgreSQL DATE); not persisted directly, so java.util.Date is retained.
   private Date selectedDate;
   private boolean available; // changed from Boolean to boolean
 
