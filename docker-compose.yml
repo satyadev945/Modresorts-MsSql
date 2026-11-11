@@ -1,0 +1,28 @@
+services:
+  modresorts:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: modresorts:latest
+    container_name: modresorts
+    ports:
+      - "8080:8080"
+    environment:
+      TZ: UTC
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Duser.timezone=UTC -Dfile.encoding=UTF-8 -Duser.home=/home/app"
+      # Optional application settings (external services are provided separately)
+      WEATHER_API_KEY: "${WEATHER_API_KEY:-}"
+      REMOTE_SERVICE_GRPC_TARGET: "${REMOTE_SERVICE_GRPC_TARGET:-}"
+      SERVER_NAME: "${SERVER_NAME:-modresorts}"
+    volumes:
+      - app-data:/home/app
+    networks:
+      - app-network
+    restart: unless-stopped
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  app-data:
