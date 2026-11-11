@@ -1,0 +1,34 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: modresorts-service
+  namespace: modresorts
+  labels:
+    app: modresorts
+  annotations:
+    cloud.google.com/neg: '{"ingress": true}'
+    cloud.google.com/backend-config: '{"default": "modresorts-backendconfig"}'
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+      protocol: TCP
+  selector:
+    app: modresorts
+---
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: modresorts-backendconfig
+  namespace: modresorts
+spec:
+  healthCheck:
+    type: HTTP
+    requestPath: /resorts/health
+    port: 8080
+  sessionAffinity:
+    affinityType: GENERATED_COOKIE
+    affinityCookieTtlSec: 1800
+  timeoutSec: 30

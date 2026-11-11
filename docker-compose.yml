@@ -1,0 +1,30 @@
+services:
+  modresorts:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: modresorts:latest
+    container_name: modresorts
+    ports:
+      - "8080:8080"
+    environment:
+      - TZ=UTC
+      - JAVA_OPTS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Xms256m -Dfile.encoding=UTF-8 -Duser.timezone=UTC
+      # Optional: real-time weather data (default data is used when empty)
+      - WEATHER_API_KEY=${WEATHER_API_KEY:-}
+      # Optional: external gRPC weather service target (host:port)
+      - WEATHER_GRPC_TARGET=${WEATHER_GRPC_TARGET:-}
+      - SERVER_NAME=${SERVER_NAME:-modresorts-local}
+    volumes:
+      # user.home of the app user (reservations.zip export location)
+      - app-data:/home/app
+    networks:
+      - app-network
+    restart: unless-stopped
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  app-data:

@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: modresorts-ingress
+  namespace: modresorts
+  labels:
+    app: modresorts
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+spec:
+  rules:
+    # No host set so the ingress works on the load balancer IP; add "host: modresorts.example.com" for DNS-based routing.
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: modresorts-service
+                port:
+                  number: 80
