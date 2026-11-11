@@ -16,6 +16,9 @@ import software.amazon.awssdk.services.s3.model.GetObjectRequest;
  * Configuration loading utilities. No local file system writes are performed:
  * configuration is streamed directly into memory either from Amazon S3 (when
  * CONFIG_S3_BUCKET is set) or from read-only classpath resources.
+ * <p>
+ * Any byte[] handled here is in-memory only; if binary data is ever stored in
+ * PostgreSQL, use a BYTEA column with setBytes()/getBytes() (Types.BINARY).
  */
 public final class IOUtils {
 

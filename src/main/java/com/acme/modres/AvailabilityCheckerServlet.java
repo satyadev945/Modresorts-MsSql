@@ -113,6 +113,8 @@ public class AvailabilityCheckerServlet extends HttpServlet {
       return -1;
     }
 
+    // Note: binary content is handled as byte[] in memory / S3; if persisted to PostgreSQL
+    // use a BYTEA column with setBytes()/getBytes() (Types.BINARY, not VARBINARY).
     try (S3Client s3 = S3Client.create()) {
       // Read source object from S3 and zip it in memory
       ByteArrayOutputStream zipBytes = new ByteArrayOutputStream();
