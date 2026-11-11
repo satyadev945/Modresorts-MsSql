@@ -7,6 +7,7 @@ import com.acme.modres.Constants;
 
 public class ReservationCheckerData {
   private ReservationList reservations;
+  // Date-only value (format MM/dd/yyyy, no time component); maps to a PostgreSQL DATE column if persisted.
   private Date selectedDate;
   private boolean available; // changed from Boolean to boolean
 
