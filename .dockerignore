@@ -1,0 +1,5 @@
+.git
+target/
+build/
+migration-bundle/
+*.md
