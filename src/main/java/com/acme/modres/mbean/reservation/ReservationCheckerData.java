@@ -7,6 +7,7 @@ import com.acme.modres.Constants;
 
 public class ReservationCheckerData {
   private ReservationList reservations;
+  // In-memory parsed request date only (not mapped to a DB column); a PostgreSQL DATE column would map to java.time.LocalDate.
   private Date selectedDate;
   private boolean available; // changed from Boolean to boolean
 
