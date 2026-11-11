@@ -16,6 +16,9 @@ public final class IOUtils {
    * Reads a classpath resource fully into memory. No local file system writes are performed (the
    * local file system is ephemeral in cloud environments).
    *
+   * <p>The byte[] result is a plain binary buffer; if persisted to PostgreSQL it maps to BYTEA
+   * (JDBC setBytes()/getBytes(), Types.BINARY) rather than SQL Server VARBINARY.
+   *
    * @return the resource content, or null if it cannot be read
    */
   public static byte[] getBytesFromRelativePath(String path) {

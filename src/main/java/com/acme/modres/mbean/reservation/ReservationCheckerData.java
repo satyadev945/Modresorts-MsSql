@@ -7,6 +7,8 @@ import com.acme.modres.util.DateUtil;
 
 public class ReservationCheckerData {
   private ReservationList reservations;
+  // Date-only value (maps to PostgreSQL DATE if persisted); not bound to any DB column here.
+  // Callers (DateChecker, AvailabilityCheckerServlet) use java.util.Date, so type is retained.
   private Date selectedDate;
   private boolean available; // changed from Boolean to boolean
 

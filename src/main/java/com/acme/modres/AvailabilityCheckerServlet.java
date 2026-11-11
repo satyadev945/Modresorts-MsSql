@@ -113,6 +113,8 @@ public class AvailabilityCheckerServlet extends HttpServlet {
     String containerName = System.getenv().getOrDefault("AZURE_STORAGE_CONTAINER_NAME", "reservations");
     String blobName = System.getenv().getOrDefault("AZURE_STORAGE_BLOB_NAME", "reservations.zip");
 
+    // Note: byte[] here is an in-memory zip payload for Blob Storage, not a SQL column;
+    // if ever persisted to PostgreSQL, use BYTEA (setBytes()/getBytes(), Types.BINARY).
     try {
       if (connectionString == null || connectionString.isEmpty()) {
         logger.severe("AZURE_STORAGE_CONNECTION_STRING is not configured");
