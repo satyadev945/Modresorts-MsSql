@@ -49,7 +49,10 @@ public class WeatherServlet extends HttpServlet {
   // local OS environment variable key name. The key value should provide an API
   // key that will be used to
   // get weather information from site: http://www.wunderground.com
+  // In GKE Autopilot the key is sourced from Secret Manager (mounted as a file via the
+  // Secret Manager CSI driver using Workload Identity); the env var is a fallback.
   private static final String WEATHER_API_KEY = "WEATHER_API_KEY";
+  private static final String WEATHER_API_KEY_FILE = "WEATHER_API_KEY_FILE";
 
   private static final Logger logger = Logger.getLogger(WeatherServlet.class.getName());
 
@@ -106,7 +109,7 @@ public class WeatherServlet extends HttpServlet {
     String city = request.getParameter("selectedCity");
     logger.log(Level.FINE, "requested city is " + city);
 
-    String weatherAPIKey = System.getenv(WEATHER_API_KEY);
+    String weatherAPIKey = resolveWeatherApiKey();
     String mockedKey = mockKey(weatherAPIKey);
     logger.log(Level.FINE, "weatherAPIKey is " + mockedKey);
 
@@ -241,6 +244,19 @@ public class WeatherServlet extends HttpServlet {
     doGet(request, response);
   }
 
+  private static String resolveWeatherApiKey() {
+    String keyFile = System.getenv(WEATHER_API_KEY_FILE);
+    if (keyFile != null && !keyFile.trim().isEmpty()) {
+      try {
+        return new String(java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(keyFile.trim())),
+            java.nio.charset.StandardCharsets.UTF_8).trim();
+      } catch (IOException e) {
+        logger.log(Level.WARNING, "Unable to read weather API key from mounted secret file: " + e.getMessage());
+      }
+    }
+    return System.getenv(WEATHER_API_KEY);
+  }
+
   private static String mockKey(String toBeMocked) {
     if (toBeMocked == null) {
       return null;
@@ -253,8 +269,10 @@ public class WeatherServlet extends HttpServlet {
 
     String serverEnv = "";
 
-    serverEnv += com.ibm.websphere.runtime.ServerName.getDisplayName();
-    serverEnv += com.ibm.websphere.runtime.ServerName.getFullName();
+    String displayName = System.getenv("SERVER_DISPLAY_NAME");
+    String fullName = System.getenv("HOSTNAME");
+    serverEnv += (displayName != null) ? displayName : "";
+    serverEnv += (fullName != null) ? fullName : "";
 
     return serverEnv;
   }
@@ -263,8 +281,19 @@ public class WeatherServlet extends HttpServlet {
 
     Hashtable ht = new Hashtable();
 
-    ht.put("java.naming.factory.initial", "com.ibm.websphere.naming.WsnInitialContextFactory");
-    ht.put("java.naming.provider.url", "corbaloc:iiop:localhost:2809");
+    // RMI registry lookups are not available in containers. The remote service endpoint
+    // must be supplied externally (env var / Secret Manager mounted value, e.g. a gRPC
+    // service on GKE reached via Workload Identity); no RMI registry is assumed.
+    String jndiFactory = System.getenv("JNDI_INITIAL_CONTEXT_FACTORY");
+    String jndiUrl = System.getenv("JNDI_PROVIDER_URL");
+    if (jndiUrl == null || jndiUrl.isEmpty()) {
+      logger.info("JNDI_PROVIDER_URL not set; skipping RMI/JNDI initial context creation.");
+      return null;
+    }
+    if (jndiFactory != null && !jndiFactory.isEmpty()) {
+      ht.put("java.naming.factory.initial", jndiFactory);
+    }
+    ht.put("java.naming.provider.url", jndiUrl);
 
     InitialContext ctx = null;
     try {
