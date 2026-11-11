@@ -1,31 +1,28 @@
 package com.acme.modres.util;
 
-import java.io.File;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.util.Enumeration;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipException;
-import java.util.zip.ZipFile;
+import java.util.zip.ZipInputStream;
 
-public class ZipValidator extends ZipFile {
+/**
+ * Validates zip content held in memory (e.g. downloaded from Azure Blob
+ * Storage) so no local file system access is required.
+ */
+public class ZipValidator {
 
-  public ZipValidator(File file) throws ZipException, IOException {
-    super(file);
-    this.file = file;
+  private final byte[] content;
+
+  public ZipValidator(byte[] content) {
+    this.content = content;
   }
 
-  private File file;
-
-  public boolean isValid() throws Throwable {
-    if (file.exists()) {
-      ZipValidator zipFile = new ZipValidator(file);
-      Enumeration<? extends ZipEntry> entries = zipFile.entries();
-      if (!entries.hasMoreElements()) {
-        return true;
-      }
-      zipFile.close();
+  public boolean isValid() throws IOException {
+    if (content == null || content.length == 0) {
+      return false;
     }
-    return false;
+    try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(content))) {
+      return zis.getNextEntry() != null;
+    }
   }
 
 }

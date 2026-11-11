@@ -9,10 +9,37 @@
     'use strict';
 
     var moment;
+
+    // Report (rather than swallow) failures to load the optional moment.js dependency.
+    // Sends a structured exception to Azure Application Insights when available
+    // (server: applicationinsights SDK defaultClient, browser: appInsights JS SDK).
+    function reportOptionalDependencyError(dependency, err)
+    {
+        var props = { component: 'pikaday', dependency: dependency, severity: 'warning' };
+        try {
+            if (typeof exports === 'object' && typeof require === 'function') {
+                var ai = require('applicationinsights');
+                if (ai && ai.defaultClient) {
+                    ai.defaultClient.trackException({ exception: err, properties: props });
+                    return;
+                }
+            }
+        } catch (ignore) { /* applicationinsights SDK not available; fall through */ }
+        try {
+            if (typeof window !== 'undefined' && window.appInsights && typeof window.appInsights.trackException === 'function') {
+                window.appInsights.trackException({ exception: err, properties: props });
+                return;
+            }
+        } catch (ignore) { /* fall through to console */ }
+        if (typeof console !== 'undefined' && console.warn) {
+            console.warn(JSON.stringify({ level: 'warn', message: 'Optional dependency not loaded', component: 'pikaday', dependency: dependency, error: String(err) }));
+        }
+    }
+
     if (typeof exports === 'object') {
         // CommonJS module
         // Load moment.js as an optional dependency
-        try { moment = require('moment'); } catch (e) {}
+        try { moment = require('moment'); } catch (e) { reportOptionalDependencyError('moment', e); }
         module.exports = factory(moment);
     } else if (typeof define === 'function' && define.amd) {
         // AMD. Register as an anonymous module.
@@ -20,7 +47,7 @@
         {
             // Load moment.js as an optional dependency
             var id = 'moment';
-            try { moment = req(id); } catch (e) {}
+            try { moment = req(id); } catch (e) { reportOptionalDependencyError('moment', e); }
             return factory(moment);
         });
     } else {
