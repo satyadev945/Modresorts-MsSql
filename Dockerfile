@@ -8,20 +8,34 @@ COPY WebContent ./WebContent
 COPY purgecss.config.js ./
 RUN npx purgecss --config purgecss.config.js
 
-# ---- Stage 2: build the application using the purged static assets ----
-FROM maven:3.9-eclipse-temurin-17 AS build
-WORKDIR /app
+# ---- Stage 2: build the application (Java 8 source/target) ----
+FROM maven:3.9.4-eclipse-temurin-8 AS builder
+WORKDIR /workspace
 COPY pom.xml ./
 RUN mvn -B -q dependency:go-offline
 COPY src ./src
 COPY WebContent ./WebContent
 COPY --from=css-optimizer /build/WebContent/styles.css ./WebContent/styles.css
-RUN mvn -B -q package -DskipTests
+RUN mvn -B clean package -DskipTests
 
-# ---- Stage 3: minimal runtime image ----
-FROM eclipse-temurin:17-jre-alpine
+# ---- Stage 3: runtime image ----
+FROM eclipse-temurin:8-jre
 WORKDIR /app
-COPY --from=build /app/target/modresorts-*.jar /app/app.jar
+
+ENV TZ=UTC \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
+    SPRING_PROFILES_ACTIVE=docker \
+    SERVER_PORT=8080 \
+    JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Xms256m -Dfile.encoding=UTF-8 -Djava.security.egd=file:/dev/./urandom"
+
+RUN groupadd -r -g 1001 appgroup && useradd -r -u 1001 -g appgroup -d /app -s /sbin/nologin appuser
+
+COPY --from=builder --chown=appuser:appgroup /workspace/target/modresorts-*.jar /app/app.jar
+
+USER appuser
+
 EXPOSE 8080
-HEALTHCHECK --interval=30s --timeout=3s --start-period=30s CMD wget -qO- http://localhost:8080/health || exit 1
-ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+
+# exec form via sh so JAVA_OPTS is expanded and java is PID 1 (graceful SIGTERM shutdown)
+ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar /app/app.jar"]
