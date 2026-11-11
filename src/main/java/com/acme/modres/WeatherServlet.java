@@ -124,6 +124,8 @@ public class WeatherServlet extends HttpServlet {
     }
   }
 
+  // Note: these values are REST endpoint paths, not SQL Server JDBC settings; no datasource
+  // URL/driver (spring.datasource.*) is used here, so no PostgreSQL JDBC translation applies.
   private void getRealTimeWeatherData(String city, String apiKey, HttpServletResponse response)
       throws ServletException, IOException {
     String resturl = null;
