@@ -1,0 +1,6 @@
+.git
+target
+migration-bundle
+*.iml
+.idea
+.vscode
