@@ -6,6 +6,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 
 import com.google.gson.Gson;
 
@@ -25,7 +26,7 @@ public class JsonInputStream extends FileInputStream {
       try {
         is = new JsonInputStream(file);
         Gson gson = new Gson();
-        BufferedReader reader = new BufferedReader(new InputStreamReader(is));
+        BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8));
         jsonObject = gson.fromJson(reader, cls);
       } catch (Exception e) {
         e.printStackTrace();
