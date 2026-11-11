@@ -1,16 +1,14 @@
 package com.acme.modres;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.logging.Logger;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 import javax.naming.InitialContext;
@@ -25,7 +23,10 @@ import com.acme.modres.mbean.reservation.DateChecker;
 import com.acme.modres.mbean.reservation.ReservationCheckerData;
 import com.acme.modres.mbean.reservation.Reservation;
 
-import com.acme.modres.util.ZipValidator;
+import com.azure.identity.DefaultAzureCredentialBuilder;
+import com.azure.storage.blob.BlobClient;
+import com.azure.storage.blob.BlobContainerClient;
+import com.azure.storage.blob.BlobServiceClientBuilder;
 
 @WebServlet({ "/resorts/availability" })
 public class AvailabilityCheckerServlet extends HttpServlet {
@@ -61,8 +62,8 @@ public class AvailabilityCheckerServlet extends HttpServlet {
 
       for (Reservation reservation : reservations) {
         try {
-          Date fromDate = new SimpleDateFormat(Constants.DATA_FORMAT).parse(reservation.getFromDate());
-          Date toDate = new SimpleDateFormat(Constants.DATA_FORMAT).parse(reservation.getToDate());
+          Date fromDate = DateUtils.parse(reservation.getFromDate());
+          Date toDate = DateUtils.parse(reservation.getToDate());
           Date selectedDate = reservationCheckerData.getSelectedDate();
 
           if (selectedDate.after(fromDate) && selectedDate.before(toDate)) {
@@ -83,11 +84,12 @@ public class AvailabilityCheckerServlet extends HttpServlet {
     }
 
     // Send the response
-    PrintWriter out = response.getWriter();
     response.setContentType("application/json");
     response.setCharacterEncoding("UTF-8");
-    out.print("{\"availability\": \"" + String.valueOf(reservationCheckerData.isAvailible()) + "\"}");
     response.setStatus(statusCode);
+    try (PrintWriter out = response.getWriter()) {
+      out.print("{\"availability\": \"" + String.valueOf(reservationCheckerData.isAvailible()) + "\"}");
+    }
   }
 
   /**
@@ -100,42 +102,64 @@ public class AvailabilityCheckerServlet extends HttpServlet {
   }
 
   protected int exportRevervations(String selectedDateStr) {
-    File fileToZip = IOUtils.getFileFromRelativePath("reservations.json");
-    String userDirectory = System.getProperty("user.home");
-    String zipPath = userDirectory + "/reservations.zip";
+    byte[] reservationBytes = IOUtils.getBytesFromRelativePath("reservations.json");
+    if (reservationBytes == null) {
+      logger.severe("reservations.json could not be loaded from classpath");
+      return -1;
+    }
 
-    FileOutputStream fos;
+    // Azure Blob Storage configuration (externalized via environment variables)
+    String connectionString = System.getenv("AZURE_STORAGE_CONNECTION_STRING");
+    String containerName = System.getenv().getOrDefault("AZURE_STORAGE_CONTAINER_NAME", "reservations");
+    String blobName = System.getenv().getOrDefault("AZURE_STORAGE_RESERVATIONS_BLOB_NAME", "reservations.zip");
+
     try {
-      fos = new FileOutputStream(zipPath);
-      ZipOutputStream zipOut = new ZipOutputStream(fos);
-
-      FileInputStream fis = new FileInputStream(fileToZip);
-      ZipEntry zipEntry = new ZipEntry(fileToZip.getName());
-      zipOut.putNextEntry(zipEntry);
-
-      byte[] bytes = new byte[1024];
-      int length;
-      while ((length = fis.read(bytes)) >= 0) {
-        zipOut.write(bytes, 0, length);
+      // build the zip in memory instead of writing to a host file system path
+      byte[] zipBytes;
+      try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
+          ZipOutputStream zipOut = new ZipOutputStream(baos)) {
+        ZipEntry zipEntry = new ZipEntry("reservations.json");
+        zipOut.putNextEntry(zipEntry);
+        zipOut.write(reservationBytes, 0, reservationBytes.length);
+        zipOut.closeEntry();
+        zipOut.finish();
+        zipBytes = baos.toByteArray();
       }
-      fis.close();
-
-      zipOut.close();
-      fos.close();
 
       // verify zip
-      ZipValidator zipValidator = new ZipValidator(new File(zipPath));
-      if (zipValidator.isValid()) {
-        return 0;
+      boolean valid = false;
+      try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(zipBytes))) {
+        valid = zis.getNextEntry() != null;
       }
-    } catch (FileNotFoundException e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
+      if (!valid) {
+        return -1;
+      }
+
+      // upload zip to Azure Blob Storage
+      BlobServiceClientBuilder builder = new BlobServiceClientBuilder();
+      if (connectionString != null && !connectionString.isEmpty()) {
+        builder.connectionString(connectionString);
+      } else {
+        String accountName = System.getenv("AZURE_STORAGE_ACCOUNT_NAME");
+        if (accountName == null || accountName.isEmpty()) {
+          logger.severe("Azure Storage is not configured (AZURE_STORAGE_CONNECTION_STRING or AZURE_STORAGE_ACCOUNT_NAME)");
+          return -1;
+        }
+        builder.endpoint("https://" + accountName + ".blob.core.windows.net")
+            .credential(new DefaultAzureCredentialBuilder().build());
+      }
+      BlobContainerClient containerClient = builder.buildClient().getBlobContainerClient(containerName);
+      if (!containerClient.exists()) {
+        containerClient.create();
+      }
+      BlobClient blobClient = containerClient.getBlobClient(blobName);
+      try (ByteArrayInputStream uploadStream = new ByteArrayInputStream(zipBytes)) {
+        blobClient.upload(uploadStream, zipBytes.length, true);
+      }
+      return 0;
     } catch (IOException e) {
-      // TODO Auto-generated catch block
       e.printStackTrace();
     } catch (Throwable e) {
-      // TODO Auto-generated catch block
       e.printStackTrace();
     }
     return -1;

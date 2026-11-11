@@ -1,9 +1,8 @@
 package com.acme.modres.mbean.reservation;
 
-import java.text.SimpleDateFormat;
 import java.util.Date;
 
-import com.acme.modres.Constants;
+import com.acme.modres.DateUtils;
 
 public class ReservationCheckerData {
   private ReservationList reservations;
@@ -25,7 +24,7 @@ public class ReservationCheckerData {
 
   public boolean setSelectedDate(String dateStr) {
     try {
-      selectedDate = new SimpleDateFormat(Constants.DATA_FORMAT).parse(dateStr);
+      selectedDate = DateUtils.parse(dateStr);
     } catch (Exception e) {
       return false;
     }

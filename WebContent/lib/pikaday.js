@@ -8,11 +8,34 @@
 {
     'use strict';
 
+    // Report optional-dependency load failures to Azure Application Insights (if configured)
+    function logOptionalDependencyError(err, dependency)
+    {
+        var props = { component: 'pikaday', dependency: dependency, severity: 'warning' };
+        try {
+            var ai = (root && root.appInsights) || (typeof window !== 'undefined' && window.appInsights);
+            if (ai && typeof ai.trackException === 'function') {
+                ai.trackException({ exception: err, properties: props });
+                return;
+            }
+            if (typeof require === 'function' && typeof exports === 'object') {
+                var aiNode = require('applicationinsights');
+                if (aiNode && aiNode.defaultClient) {
+                    aiNode.defaultClient.trackException({ exception: err, properties: props });
+                    return;
+                }
+            }
+        } catch (ignore) { /* telemetry must never break the app */ }
+        if (typeof console !== 'undefined' && console.warn) {
+            console.warn('[pikaday] optional dependency "' + dependency + '" unavailable', err);
+        }
+    }
+
     var moment;
     if (typeof exports === 'object') {
         // CommonJS module
         // Load moment.js as an optional dependency
-        try { moment = require('moment'); } catch (e) {}
+        try { moment = require('moment'); } catch (e) { logOptionalDependencyError(e, 'moment'); }
         module.exports = factory(moment);
     } else if (typeof define === 'function' && define.amd) {
         // AMD. Register as an anonymous module.
@@ -20,7 +43,7 @@
         {
             // Load moment.js as an optional dependency
             var id = 'moment';
-            try { moment = req(id); } catch (e) {}
+            try { moment = req(id); } catch (e) { logOptionalDependencyError(e, 'moment'); }
             return factory(moment);
         });
     } else {

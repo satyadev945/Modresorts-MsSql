@@ -344,3 +344,21 @@ function callAvailabilityChecker(dateObj, elem) {
     request.send();
 }
 window.callAvailabilityChecker = callAvailabilityChecker;
+// CSP-compliant event bindings (replaces inline onchange/onclick handlers)
+(function () {
+    function bindEventHandlers() {
+        var citySelect = document.getElementById('citySelect');
+        if (citySelect) {
+            citySelect.addEventListener('change', function () { callRESTAPI(); });
+        }
+        var reserveButton = document.getElementById('reserveButton');
+        if (reserveButton) {
+            reserveButton.addEventListener('click', function () { confirmReservcation(); });
+        }
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', bindEventHandlers);
+    } else {
+        bindEventHandlers();
+    }
+})();
