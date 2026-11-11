@@ -35,8 +35,6 @@ import javax.management.NotCompliantMBeanException;
 import javax.management.ObjectInstance;
 import javax.management.ObjectName;
 import javax.management.ReflectionException;
-import javax.naming.InitialContext;
-import javax.naming.NamingException;
 import javax.servlet.annotation.WebServlet;
 
 @WebServlet({ "/resorts/weather" })
@@ -51,9 +49,12 @@ public class WeatherServlet extends HttpServlet {
   // get weather information from site: http://www.wunderground.com
   private static final String WEATHER_API_KEY = "WEATHER_API_KEY";
 
+  // Weather is an independently deployable component (own container image / GKE Autopilot pod,
+  // Workload Identity). Its logger is per-class and writes to stdout/stderr for container log collection;
+  // the API key (WEATHER_API_KEY) is expected to be injected from Secret Manager, not shared in-process.
   private static final Logger logger = Logger.getLogger(WeatherServlet.class.getName());
 
-  private static InitialContext context;
+  private static String remoteServiceTarget;
 
   MBeanServer server;
   ObjectName weatherON;
@@ -75,7 +76,7 @@ public class WeatherServlet extends HttpServlet {
     } catch (InstanceAlreadyExistsException | MBeanRegistrationException | NotCompliantMBeanException e) {
       e.printStackTrace();
     }
-    context = setInitialContextProps();
+    remoteServiceTarget = resolveRemoteServiceTarget();
   }
 
   @Override
@@ -253,26 +254,25 @@ public class WeatherServlet extends HttpServlet {
 
     String serverEnv = "";
 
-    serverEnv += com.ibm.websphere.runtime.ServerName.getDisplayName();
-    serverEnv += com.ibm.websphere.runtime.ServerName.getFullName();
+    String hostName = System.getenv("HOSTNAME");
+    String serverName = System.getenv("SERVER_NAME");
+    serverEnv += (serverName != null ? serverName : "");
+    serverEnv += (hostName != null ? hostName : "");
 
     return serverEnv;
   }
 
-  private InitialContext setInitialContextProps() {
-
-    Hashtable ht = new Hashtable();
-
-    ht.put("java.naming.factory.initial", "com.ibm.websphere.naming.WsnInitialContextFactory");
-    ht.put("java.naming.provider.url", "corbaloc:iiop:localhost:2809");
-
-    InitialContext ctx = null;
-    try {
-      ctx = new InitialContext(ht);
-    } catch (NamingException e) {
-      e.printStackTrace();
+  /**
+   * RMI/JNDI remote lookups are not available in containers. Remote services are
+   * addressed through a gRPC target supplied by environment variable (e.g. from a
+   * Kubernetes ConfigMap / Secret Manager) instead of an RMI registry URL.
+   */
+  private String resolveRemoteServiceTarget() {
+    String target = System.getenv("WEATHER_GRPC_TARGET");
+    if (target == null || target.isEmpty()) {
+      logger.fine("WEATHER_GRPC_TARGET not set; remote service lookup disabled");
+      return null;
     }
-
-    return ctx;
+    return target;
   }
 }
