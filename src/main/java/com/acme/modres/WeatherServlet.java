@@ -8,6 +8,7 @@ import java.io.BufferedReader;
 
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.lang.management.ManagementFactory;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
@@ -17,13 +18,13 @@ import java.util.Hashtable;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import javax.servlet.ServletException;
-import javax.servlet.ServletOutputStream;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.ServletOutputStream;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 import javax.management.InstanceAlreadyExistsException;
 import javax.management.InstanceNotFoundException;
 import javax.management.IntrospectionException;
@@ -37,7 +38,7 @@ import javax.management.ObjectName;
 import javax.management.ReflectionException;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
-import javax.servlet.annotation.WebServlet;
+import jakarta.servlet.annotation.WebServlet;
 
 @WebServlet({ "/resorts/weather" })
 public class WeatherServlet extends HttpServlet {
@@ -170,7 +171,7 @@ public class WeatherServlet extends HttpServlet {
       ServletOutputStream out = null;
 
       try {
-        in = new BufferedReader(new InputStreamReader(con.getInputStream()));
+        in = new BufferedReader(new InputStreamReader(con.getInputStream(), StandardCharsets.UTF_8));
         String inputLine = null;
         StringBuffer responseStr = new StringBuffer();
 
