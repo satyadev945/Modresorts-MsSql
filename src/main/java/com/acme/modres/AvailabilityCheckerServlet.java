@@ -61,15 +61,16 @@ public class AvailabilityCheckerServlet extends HttpServlet {
 
       for (Reservation reservation : reservations) {
         try {
-          Date fromDate = new SimpleDateFormat(Constants.DATA_FORMAT).parse(reservation.getFromDate());
-          Date toDate = new SimpleDateFormat(Constants.DATA_FORMAT).parse(reservation.getToDate());
-          Date selectedDate = reservationCheckerData.getSelectedDate();
+          java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern(Constants.DATA_FORMAT);
+          java.time.LocalDate fromDate = java.time.LocalDate.parse(reservation.getFromDate(), fmt);
+          java.time.LocalDate toDate = java.time.LocalDate.parse(reservation.getToDate(), fmt);
+          java.time.LocalDate selectedDate = reservationCheckerData.getSelectedDate();
 
-          if (selectedDate.after(fromDate) && selectedDate.before(toDate)) {
+          if (selectedDate.isAfter(fromDate) && selectedDate.isBefore(toDate)) {
             isAvailible = false;
             break;
           }
-        } catch (ParseException ex) {
+        } catch (java.time.format.DateTimeParseException ex) {
           ex.printStackTrace();
         }
       }
