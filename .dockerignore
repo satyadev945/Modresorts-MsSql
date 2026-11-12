@@ -1,0 +1,7 @@
+target/
+build/
+.git/
+.idea/
+.vscode/
+migration-bundle/
+node_modules/

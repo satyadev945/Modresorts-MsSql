@@ -51,6 +51,11 @@ public class WeatherServlet extends HttpServlet {
   // get weather information from site: http://www.wunderground.com
   private static final String WEATHER_API_KEY = "WEATHER_API_KEY";
 
+  // Path of the secret file mounted by the Azure Key Vault CSI driver (Secrets Store CSI) in AKS.
+  // Overridable via env var so the weather secret is decoupled from the application image.
+  private static final String WEATHER_API_KEY_FILE = "WEATHER_API_KEY_FILE";
+  private static final String DEFAULT_WEATHER_API_KEY_PATH = "/mnt/secrets-store/weather-api-key";
+
   private static final Logger logger = Logger.getLogger(WeatherServlet.class.getName());
 
   private static InitialContext context;
@@ -106,7 +111,7 @@ public class WeatherServlet extends HttpServlet {
     String city = request.getParameter("selectedCity");
     logger.log(Level.FINE, "requested city is " + city);
 
-    String weatherAPIKey = System.getenv(WEATHER_API_KEY);
+    String weatherAPIKey = resolveWeatherApiKey();
     String mockedKey = mockKey(weatherAPIKey);
     logger.log(Level.FINE, "weatherAPIKey is " + mockedKey);
 
@@ -241,6 +246,30 @@ public class WeatherServlet extends HttpServlet {
     doGet(request, response);
   }
 
+  /**
+   * Resolves the weather API key from the Key Vault CSI-mounted secret file (Workload Identity),
+   * falling back to the WEATHER_API_KEY environment variable.
+   */
+  private static String resolveWeatherApiKey() {
+    String path = System.getenv(WEATHER_API_KEY_FILE);
+    if (path == null || path.trim().isEmpty()) {
+      path = DEFAULT_WEATHER_API_KEY_PATH;
+    }
+    try {
+      java.nio.file.Path secretPath = java.nio.file.Paths.get(path);
+      if (java.nio.file.Files.isReadable(secretPath)) {
+        String value = new String(java.nio.file.Files.readAllBytes(secretPath),
+            java.nio.charset.StandardCharsets.UTF_8).trim();
+        if (!value.isEmpty()) {
+          return value;
+        }
+      }
+    } catch (IOException | RuntimeException e) {
+      logger.log(Level.FINE, "Unable to read mounted weather API key secret: " + e.getMessage());
+    }
+    return System.getenv(WEATHER_API_KEY);
+  }
+
   private static String mockKey(String toBeMocked) {
     if (toBeMocked == null) {
       return null;
@@ -253,8 +282,12 @@ public class WeatherServlet extends HttpServlet {
 
     String serverEnv = "";
 
-    serverEnv += com.ibm.websphere.runtime.ServerName.getDisplayName();
-    serverEnv += com.ibm.websphere.runtime.ServerName.getFullName();
+    // Server identity comes from the container environment (no vendor application-server API)
+    String serverName = System.getenv("SERVER_NAME");
+    if (serverName == null || serverName.isEmpty()) {
+      serverName = System.getenv("HOSTNAME");
+    }
+    serverEnv += (serverName == null) ? "" : serverName;
 
     return serverEnv;
   }
@@ -263,8 +296,17 @@ public class WeatherServlet extends HttpServlet {
 
     Hashtable ht = new Hashtable();
 
-    ht.put("java.naming.factory.initial", "com.ibm.websphere.naming.WsnInitialContextFactory");
-    ht.put("java.naming.provider.url", "corbaloc:iiop:localhost:2809");
+    // No RMI/IIOP registry lookup: the initial context is container-provided (Jakarta EE / Open Liberty).
+    // Any factory/provider URL is injected via environment variables (e.g. sourced from Azure Key Vault
+    // through the AKS Secrets Store CSI driver); remote calls should use gRPC endpoints instead of RMI.
+    String factory = System.getenv("JNDI_INITIAL_CONTEXT_FACTORY");
+    if (factory != null && !factory.isEmpty()) {
+      ht.put("java.naming.factory.initial", factory);
+    }
+    String providerUrl = System.getenv("JNDI_PROVIDER_URL");
+    if (providerUrl != null && !providerUrl.isEmpty()) {
+      ht.put("java.naming.provider.url", providerUrl);
+    }
 
     InitialContext ctx = null;
     try {
