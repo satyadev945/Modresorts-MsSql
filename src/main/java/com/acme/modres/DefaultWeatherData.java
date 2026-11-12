@@ -66,6 +66,7 @@ public class DefaultWeatherData {
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     try {
       inputStream = getClass().getClassLoader().getResourceAsStream(dataFileName);
+      // Plain I/O buffer; not a database column (PostgreSQL BYTEA mapping not applicable).
       byte[] buf = new byte[4096];
       for (int n; 0 < (n = inputStream.read(buf));) {
         out.write(buf, 0, n);

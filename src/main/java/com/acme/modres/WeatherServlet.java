@@ -123,6 +123,7 @@ public class WeatherServlet extends HttpServlet {
 
   private void getRealTimeWeatherData(String city, String apiKey, HttpServletResponse response)
       throws ServletException, IOException {
+    // REST URLs below are weather API endpoints, not JDBC/datasource settings; no PostgreSQL change applies.
     String resturl = null;
     String resturlbase = Constants.WUNDERGROUND_API_PREFIX + apiKey + Constants.WUNDERGROUND_API_PART;
 

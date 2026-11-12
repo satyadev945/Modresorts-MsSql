@@ -17,6 +17,7 @@ public final class IOUtils {
     OutputStream outStream = null;
     try {
       initialStream = IOUtils.class.getClassLoader().getResourceAsStream(path);
+      // Plain I/O buffer; not a database column (PostgreSQL BYTEA mapping not applicable).
       byte[] buffer = new byte[initialStream.available()];
       initialStream.read(buffer);
 
