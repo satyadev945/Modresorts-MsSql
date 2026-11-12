@@ -123,14 +123,17 @@ public class WeatherServlet extends HttpServlet {
       logger.info("weatherAPIKey is found, system will provide the real time weather data for the city " + city);
       getRealTimeWeatherData(city, weatherAPIKey, response);
     } else {
-      logger.info(
-          "weatherAPIKey is not found, will provide the weather data dated August 10th, 2018 for the city " + city);
+      // Not a database setting: no JDBC datasource is used here (PostgreSQL: jdbc:postgresql://, org.postgresql.Driver).
+      logger.info("weatherAPIKey is not found, will provide the weather data dated August 10th, 2018 for the city "
+          + city);
       getDefaultWeatherData(city, response);
     }
   }
 
   private void getRealTimeWeatherData(String city, String apiKey, HttpServletResponse response)
       throws ServletException, IOException {
+    // No SQL Server datasource settings here; these are REST endpoints only. Any JDBC config must use
+    // jdbc:postgresql:// with org.postgresql.Driver.
     String resturl = null;
     String resturlbase = Constants.WUNDERGROUND_API_PREFIX + apiKey + Constants.WUNDERGROUND_API_PART;
 
