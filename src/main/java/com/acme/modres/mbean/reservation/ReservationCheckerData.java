@@ -1,13 +1,15 @@
 package com.acme.modres.mbean.reservation;
 
-import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.Date;
 
 import com.acme.modres.Constants;
 
 public class ReservationCheckerData {
   private ReservationList reservations;
-  private Date selectedDate;
+  private LocalDate selectedDate; // date-only, maps to PostgreSQL DATE
   private boolean available; // changed from Boolean to boolean
 
   public ReservationCheckerData(ReservationList reservations) {
@@ -20,12 +22,16 @@ public class ReservationCheckerData {
   }
 
   public Date getSelectedDate() {
+    return selectedDate == null ? null : Date.from(selectedDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
+  }
+
+  public LocalDate getSelectedLocalDate() {
     return selectedDate;
   }
 
   public boolean setSelectedDate(String dateStr) {
     try {
-      selectedDate = new SimpleDateFormat(Constants.DATA_FORMAT).parse(dateStr);
+      selectedDate = LocalDate.parse(dateStr, DateTimeFormatter.ofPattern(Constants.DATA_FORMAT));
     } catch (Exception e) {
       return false;
     }
