@@ -23,6 +23,12 @@ public class ReservationCheckerData {
     return selectedDate;
   }
 
+  /** Date-only view (maps to PostgreSQL DATE) of the selected date. */
+  public java.time.LocalDate getSelectedLocalDate() {
+    return selectedDate == null ? null
+        : selectedDate.toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDate();
+  }
+
   public boolean setSelectedDate(String dateStr) {
     try {
       selectedDate = new SimpleDateFormat(Constants.DATA_FORMAT).parse(dateStr);
