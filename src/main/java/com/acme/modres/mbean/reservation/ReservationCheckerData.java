@@ -7,6 +7,7 @@ import java.time.format.DateTimeFormatter;
 
 import com.acme.modres.Constants;
 
+// Dates use java.time types (LocalDate parsing); maps to PostgreSQL DATE without a time component
 public class ReservationCheckerData {
   private ReservationList reservations;
   private Instant selectedDate;
