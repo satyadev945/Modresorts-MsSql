@@ -123,9 +123,11 @@ public class WeatherServlet extends HttpServlet {
       getDefaultWeatherData(city, response);
     }
   }
-
+  // JDBC config (if externalized): url=jdbc:postgresql://host:5432/db, driver=org.postgresql.Driver,
+  // dialect=org.hibernate.dialect.PostgreSQLDialect
   private void getRealTimeWeatherData(String city, String apiKey, HttpServletResponse response)
       throws ServletException, IOException {
+    // External REST endpoint; no SQL Server datasource here (PostgreSQL JDBC would use org.postgresql.Driver)
     String resturl = null;
     String resturlbase = Constants.WUNDERGROUND_API_PREFIX + apiKey + Constants.WUNDERGROUND_API_PART;
 
