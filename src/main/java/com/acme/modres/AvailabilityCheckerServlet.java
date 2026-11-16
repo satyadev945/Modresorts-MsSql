@@ -1,16 +1,14 @@
 package com.acme.modres;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.logging.Logger;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 import javax.naming.InitialContext;
@@ -25,7 +23,10 @@ import com.acme.modres.mbean.reservation.DateChecker;
 import com.acme.modres.mbean.reservation.ReservationCheckerData;
 import com.acme.modres.mbean.reservation.Reservation;
 
-import com.acme.modres.util.ZipValidator;
+import com.google.cloud.storage.BlobId;
+import com.google.cloud.storage.BlobInfo;
+import com.google.cloud.storage.Storage;
+import com.google.cloud.storage.StorageOptions;
 
 @WebServlet({ "/resorts/availability" })
 public class AvailabilityCheckerServlet extends HttpServlet {
@@ -61,8 +62,8 @@ public class AvailabilityCheckerServlet extends HttpServlet {
 
       for (Reservation reservation : reservations) {
         try {
-          Date fromDate = new SimpleDateFormat(Constants.DATA_FORMAT).parse(reservation.getFromDate());
-          Date toDate = new SimpleDateFormat(Constants.DATA_FORMAT).parse(reservation.getToDate());
+          Date fromDate = Constants.utcDateFormat().parse(reservation.getFromDate());
+          Date toDate = Constants.utcDateFormat().parse(reservation.getToDate());
           Date selectedDate = reservationCheckerData.getSelectedDate();
 
           if (selectedDate.after(fromDate) && selectedDate.before(toDate)) {
@@ -100,42 +101,54 @@ public class AvailabilityCheckerServlet extends HttpServlet {
   }
 
   protected int exportRevervations(String selectedDateStr) {
-    File fileToZip = IOUtils.getFileFromRelativePath("reservations.json");
-    String userDirectory = System.getProperty("user.home");
-    String zipPath = userDirectory + "/reservations.zip";
+    byte[] reservationBytes = IOUtils.getBytesFromRelativePath("reservations.json");
+    if (reservationBytes == null) {
+      logger.severe("reservations.json resource not found; cannot export reservations");
+      return -1;
+    }
 
-    FileOutputStream fos;
+    // Cloud-native: build the archive in memory and store it in Google Cloud Storage
+    // instead of writing to a host-specific path (user.home).
+    String bucketName = System.getenv("GCS_BUCKET_NAME");
+    String objectName = System.getenv().getOrDefault("GCS_RESERVATIONS_ZIP_OBJECT", "reservations.zip");
+    if (bucketName == null || bucketName.isEmpty()) {
+      logger.severe("GCS_BUCKET_NAME environment variable is not set; cannot export reservations");
+      return -1;
+    }
+
     try {
-      fos = new FileOutputStream(zipPath);
-      ZipOutputStream zipOut = new ZipOutputStream(fos);
-
-      FileInputStream fis = new FileInputStream(fileToZip);
-      ZipEntry zipEntry = new ZipEntry(fileToZip.getName());
-      zipOut.putNextEntry(zipEntry);
-
-      byte[] bytes = new byte[1024];
-      int length;
-      while ((length = fis.read(bytes)) >= 0) {
-        zipOut.write(bytes, 0, length);
+      byte[] zipBytes;
+      try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
+          ZipOutputStream zipOut = new ZipOutputStream(baos)) {
+        ZipEntry zipEntry = new ZipEntry("reservations.json");
+        zipOut.putNextEntry(zipEntry);
+        zipOut.write(reservationBytes, 0, reservationBytes.length);
+        zipOut.closeEntry();
+        zipOut.finish();
+        zipBytes = baos.toByteArray();
       }
-      fis.close();
 
-      zipOut.close();
-      fos.close();
+      // verify zip content is readable
+      boolean valid = true;
+      try (ZipInputStream zin = new ZipInputStream(new ByteArrayInputStream(zipBytes))) {
+        while (zin.getNextEntry() != null) {
+          zin.closeEntry();
+        }
+      } catch (IOException e) {
+        valid = false;
+      }
 
-      // verify zip
-      ZipValidator zipValidator = new ZipValidator(new File(zipPath));
-      if (zipValidator.isValid()) {
+      if (valid) {
+        BlobInfo blobInfo = BlobInfo.newBuilder(BlobId.of(bucketName, objectName))
+            .setContentType("application/zip").build();
+        try (Storage storage = StorageOptions.getDefaultInstance().getService()) {
+          storage.create(blobInfo, zipBytes);
+        }
         return 0;
       }
-    } catch (FileNotFoundException e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
     } catch (IOException e) {
-      // TODO Auto-generated catch block
       e.printStackTrace();
     } catch (Throwable e) {
-      // TODO Auto-generated catch block
       e.printStackTrace();
     }
     return -1;

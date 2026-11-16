@@ -1,7 +1,6 @@
 package com.acme.modres.mbean.reservation;
 
 import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 
@@ -22,8 +21,8 @@ public class DateChecker implements Runnable {
       Date selectedDate = data.getSelectedDate();
 
       try {
-        Date fromDate = new SimpleDateFormat(Constants.DATA_FORMAT).parse(reservation.getFromDate());
-        Date toDate = new SimpleDateFormat(Constants.DATA_FORMAT).parse(reservation.getToDate());
+        Date fromDate = Constants.utcDateFormat().parse(reservation.getFromDate());
+        Date toDate = Constants.utcDateFormat().parse(reservation.getToDate());
         if (selectedDate.after(fromDate) && selectedDate.before(toDate)) {
           data.setAvailablility(false);
           break;
