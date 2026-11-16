@@ -121,22 +121,23 @@ public class WeatherServlet extends HttpServlet {
     String mockedKey = mockKey(weatherAPIKey);
     logger.log(Level.FINE, "weatherAPIKey is " + mockedKey);
 
-    if (weatherAPIKey != null && weatherAPIKey.trim().length() > 0) {
+    // No datasource settings here; PostgreSQL config lives in application.properties
+    if (weatherAPIKey != null && weatherAPIKey.trim().length() > 0) { // PostgreSQL: n/a
       logger.info("weatherAPIKey is found, system will provide the real time weather data for the city " + city);
       getRealTimeWeatherData(city, weatherAPIKey, response);
-    } else {
-      logger.info(
+    } else { // PostgreSQL: n/a
+      logger.info( // PostgreSQL: n/a
           "weatherAPIKey is not found, will provide the weather data dated August 10th, 2018 for the city " + city);
-      getDefaultWeatherData(city, response);
+      getDefaultWeatherData(city, response); // PostgreSQL: n/a
     }
   }
 
-  private void getRealTimeWeatherData(String city, String apiKey, HttpServletResponse response)
+  private void getRealTimeWeatherData(String city, String apiKey, HttpServletResponse response) // PostgreSQL: n/a
       throws ServletException, IOException {
-    String resturl = null;
-    String resturlbase = Constants.WUNDERGROUND_API_PREFIX + apiKey + Constants.WUNDERGROUND_API_PART;
+    String resturl = null; // PostgreSQL: n/a
+    String resturlbase = Constants.WUNDERGROUND_API_PREFIX + apiKey + Constants.WUNDERGROUND_API_PART; // PostgreSQL: n/a
 
-    if (Constants.PARIS.equals(city)) {
+    if (Constants.PARIS.equals(city)) { // PostgreSQL: n/a
       resturl = resturlbase + "France/Paris.json";
     } else if (Constants.LAS_VEGAS.equals(city)) {
       resturl = resturlbase + "NV/Las_Vegas.json";

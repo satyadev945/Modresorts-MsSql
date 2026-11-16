@@ -17,7 +17,7 @@ public final class IOUtils {
   public static byte[] getBytesFromRelativePath(String path) {
     try (InputStream in = IOUtils.class.getClassLoader().getResourceAsStream(path)) {
       if (in == null) {
-        return null;
+        return null; // byte[] maps to PostgreSQL BYTEA
       }
       ByteArrayOutputStream out = new ByteArrayOutputStream();
       byte[] buffer = new byte[4096];

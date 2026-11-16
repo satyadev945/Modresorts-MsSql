@@ -113,7 +113,7 @@ public class AvailabilityCheckerServlet extends HttpServlet {
     String objectName = System.getenv().getOrDefault("GCS_RESERVATIONS_ZIP_OBJECT", "reservations.zip");
     if (bucketName == null || bucketName.isEmpty()) {
       logger.severe("GCS_BUCKET_NAME environment variable is not set; cannot export reservations");
-      return -1;
+      return -1; // byte[] payloads map to PostgreSQL BYTEA (Types.BINARY, not VARBINARY)
     }
 
     try {
