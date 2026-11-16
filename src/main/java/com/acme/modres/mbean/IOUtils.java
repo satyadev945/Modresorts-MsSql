@@ -19,6 +19,10 @@ public final class IOUtils {
    * Reads a classpath resource fully into memory. No local file system writes
    * (no temp files) are performed, so this is safe for ephemeral/containerized
    * environments.
+   * <p>
+   * The returned byte[] is suitable for PostgreSQL BYTEA columns via
+   * PreparedStatement.setBytes / ResultSet.getBytes (use java.sql.Types.BINARY
+   * when declaring a null parameter; there is no Types.BYTEA).
    */
   public static byte[] readResourceBytes(String path) throws IOException {
     try (InputStream in = IOUtils.class.getClassLoader().getResourceAsStream(path)) {
@@ -26,6 +30,7 @@ public final class IOUtils {
         throw new FileNotFoundException("Classpath resource not found: " + path);
       }
       ByteArrayOutputStream out = new ByteArrayOutputStream();
+      // byte[] maps directly to PostgreSQL BYTEA (getBytes/setBytes)
       byte[] buffer = new byte[4096];
       int n;
       while ((n = in.read(buffer)) >= 0) {

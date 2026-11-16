@@ -122,6 +122,7 @@ public class WeatherServlet extends HttpServlet {
     String mockedKey = mockKey(weatherAPIKey);
     logger.log(Level.FINE, "weatherAPIKey is " + mockedKey);
 
+    // Note: no SQL Server JDBC settings here; datasource config is PostgreSQL (see application.properties).
     if (weatherAPIKey != null && weatherAPIKey.trim().length() > 0) {
       logger.info("weatherAPIKey is found, system will provide the real time weather data for the city " + city);
       getRealTimeWeatherData(city, weatherAPIKey, response);
