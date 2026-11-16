@@ -13,7 +13,6 @@ import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.ProtocolException;
 import java.net.URL;
-import java.util.Hashtable;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -35,8 +34,6 @@ import javax.management.NotCompliantMBeanException;
 import javax.management.ObjectInstance;
 import javax.management.ObjectName;
 import javax.management.ReflectionException;
-import javax.naming.InitialContext;
-import javax.naming.NamingException;
 import javax.servlet.annotation.WebServlet;
 
 @WebServlet({ "/resorts/weather" })
@@ -53,7 +50,9 @@ public class WeatherServlet extends HttpServlet {
 
   private static final Logger logger = Logger.getLogger(WeatherServlet.class.getName());
 
-  private static InitialContext context;
+  // Remote service endpoint (gRPC host:port) supplied through the container
+  // environment (GKE ConfigMap / Secret Manager); per-instance, not shared static state.
+  private String remoteServiceTarget;
 
   MBeanServer server;
   ObjectName weatherON;
@@ -75,7 +74,7 @@ public class WeatherServlet extends HttpServlet {
     } catch (InstanceAlreadyExistsException | MBeanRegistrationException | NotCompliantMBeanException e) {
       e.printStackTrace();
     }
-    context = setInitialContextProps();
+    remoteServiceTarget = resolveRemoteServiceTarget();
   }
 
   @Override
@@ -253,26 +252,28 @@ public class WeatherServlet extends HttpServlet {
 
     String serverEnv = "";
 
-    serverEnv += com.ibm.websphere.runtime.ServerName.getDisplayName();
-    serverEnv += com.ibm.websphere.runtime.ServerName.getFullName();
+    // Vendor-neutral server identification (no application-server API);
+    // values come from the container environment (e.g. GKE pod name / hostname).
+    String hostName = System.getenv("HOSTNAME");
+    String serverName = System.getenv("SERVER_NAME");
+    serverEnv += (serverName != null && !serverName.isEmpty()) ? serverName : "modresorts";
+    serverEnv += (hostName != null && !hostName.isEmpty()) ? hostName : "localhost";
 
     return serverEnv;
   }
 
-  private InitialContext setInitialContextProps() {
-
-    Hashtable ht = new Hashtable();
-
-    ht.put("java.naming.factory.initial", "com.ibm.websphere.naming.WsnInitialContextFactory");
-    ht.put("java.naming.provider.url", "corbaloc:iiop:localhost:2809");
-
-    InitialContext ctx = null;
-    try {
-      ctx = new InitialContext(ht);
-    } catch (NamingException e) {
-      e.printStackTrace();
+  /**
+   * Resolves the remote service endpoint (gRPC target, e.g. host:port) from the
+   * environment instead of performing an RMI/JNDI registry lookup. In GKE
+   * Autopilot the value is supplied via ConfigMap/Secret Manager and
+   * authentication uses Workload Identity.
+   */
+  private String resolveRemoteServiceTarget() {
+    String target = System.getenv("GRPC_SERVICE_TARGET");
+    if (target == null || target.isEmpty()) {
+      logger.log(Level.FINE, "GRPC_SERVICE_TARGET is not set; no remote service endpoint configured.");
+      return null;
     }
-
-    return ctx;
+    return target;
   }
 }
