@@ -17,6 +17,7 @@ public final class IOUtils {
     OutputStream outStream = null;
     try {
       initialStream = IOUtils.class.getClassLoader().getResourceAsStream(path);
+      // byte[] buffer; maps to PostgreSQL BYTEA (use getBytes()/setBytes(), Types.BINARY) if persisted
       byte[] buffer = new byte[initialStream.available()];
       initialStream.read(buffer);
 
