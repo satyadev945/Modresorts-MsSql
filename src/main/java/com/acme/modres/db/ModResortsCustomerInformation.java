@@ -1,8 +1,8 @@
 package com.acme.modres.db;
 
-import javax.annotation.Resource;
-import javax.ejb.Singleton;
-import javax.ejb.Startup;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -10,13 +10,14 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 
-@Singleton
-@Startup
+// Spring singleton bean (eagerly initialized by default) replacing the EJB 2.x/3.x @Singleton @Startup bean
+@Component
 public class ModResortsCustomerInformation {
   private static final String SELECT_CUSTOMERS_QUERY = "SELECT INFO FROM CUSTOMER";
 
-  // Removing DB connection for ease of demo setup
-  // @Resource(lookup = "jdbc/ModResortsJndi")
+  // DataSource is supplied by Spring (e.g. HikariCP pointing to AWS RDS configured via environment
+  // variables). Optional so the demo can still start without a database.
+  @Autowired(required = false)
   private DataSource dataSource;
 
   public ArrayList<String> getCustomerInformation() {
