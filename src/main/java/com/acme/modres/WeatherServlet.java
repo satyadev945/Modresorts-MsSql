@@ -51,6 +51,10 @@ public class WeatherServlet extends HttpServlet {
   // get weather information from site: http://www.wunderground.com
   private static final String WEATHER_API_KEY = "WEATHER_API_KEY";
 
+  // Optional path to a file holding the API key, e.g. a secret mounted by the
+  // Azure Key Vault CSI Secrets Store driver (Workload Identity) in AKS.
+  private static final String WEATHER_API_KEY_FILE = "WEATHER_API_KEY_FILE";
+
   private static final Logger logger = Logger.getLogger(WeatherServlet.class.getName());
 
   private static InitialContext context;
@@ -106,7 +110,7 @@ public class WeatherServlet extends HttpServlet {
     String city = request.getParameter("selectedCity");
     logger.log(Level.FINE, "requested city is " + city);
 
-    String weatherAPIKey = System.getenv(WEATHER_API_KEY);
+    String weatherAPIKey = resolveWeatherApiKey();
     String mockedKey = mockKey(weatherAPIKey);
     logger.log(Level.FINE, "weatherAPIKey is " + mockedKey);
 
@@ -241,6 +245,23 @@ public class WeatherServlet extends HttpServlet {
     doGet(request, response);
   }
 
+  private static String resolveWeatherApiKey() {
+    String key = System.getenv(WEATHER_API_KEY);
+    if (key != null && key.trim().length() > 0) {
+      return key;
+    }
+    String keyFile = System.getenv(WEATHER_API_KEY_FILE);
+    if (keyFile != null && !keyFile.trim().isEmpty()) {
+      try {
+        return new String(java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(keyFile.trim())),
+            java.nio.charset.StandardCharsets.UTF_8).trim();
+      } catch (IOException e) {
+        logger.log(Level.WARNING, "Unable to read weather API key file " + keyFile, e);
+      }
+    }
+    return key;
+  }
+
   private static String mockKey(String toBeMocked) {
     if (toBeMocked == null) {
       return null;
@@ -253,8 +274,18 @@ public class WeatherServlet extends HttpServlet {
 
     String serverEnv = "";
 
-    serverEnv += com.ibm.websphere.runtime.ServerName.getDisplayName();
-    serverEnv += com.ibm.websphere.runtime.ServerName.getFullName();
+    // Vendor (IBM WebSphere) ServerName API removed; use portable environment
+    // values (HOSTNAME is set by Kubernetes to the pod name).
+    String displayName = System.getenv("SERVER_DISPLAY_NAME");
+    if (displayName == null || displayName.isEmpty()) {
+      displayName = System.getenv("HOSTNAME");
+    }
+    String fullName = System.getenv("SERVER_FULL_NAME");
+    if (fullName == null || fullName.isEmpty()) {
+      fullName = displayName;
+    }
+    serverEnv += (displayName == null ? "" : displayName);
+    serverEnv += (fullName == null ? "" : fullName);
 
     return serverEnv;
   }
@@ -263,8 +294,13 @@ public class WeatherServlet extends HttpServlet {
 
     Hashtable ht = new Hashtable();
 
-    ht.put("java.naming.factory.initial", "com.ibm.websphere.naming.WsnInitialContextFactory");
-    ht.put("java.naming.provider.url", "corbaloc:iiop:localhost:2809");
+    // RMI/JNDI remote lookups replaced: remote service endpoint is a gRPC target
+    // injected via environment (e.g. from Azure Key Vault through the AKS CSI
+    // Secrets Store driver). No RMI registry is required in the container.
+    String grpcEndpoint = System.getenv("WEATHER_SERVICE_GRPC_ENDPOINT");
+    if (grpcEndpoint != null && !grpcEndpoint.isEmpty()) {
+      ht.put("grpc.target", grpcEndpoint);
+    }
 
     InitialContext ctx = null;
     try {
