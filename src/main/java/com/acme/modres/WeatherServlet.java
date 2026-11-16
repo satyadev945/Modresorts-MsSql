@@ -51,6 +51,11 @@ public class WeatherServlet extends HttpServlet {
   // get weather information from site: http://www.wunderground.com
   private static final String WEATHER_API_KEY = "WEATHER_API_KEY";
 
+  // Optional path to a secret file mounted by the Azure Key Vault CSI driver
+  // (Workload Identity); used when the WEATHER_API_KEY env var is not set.
+  private static final String WEATHER_API_KEY_FILE = "WEATHER_API_KEY_FILE";
+  private static final String DEFAULT_WEATHER_API_KEY_FILE = "/mnt/secrets-store/weather-api-key";
+
   private static final Logger logger = Logger.getLogger(WeatherServlet.class.getName());
 
   private static InitialContext context;
@@ -106,7 +111,7 @@ public class WeatherServlet extends HttpServlet {
     String city = request.getParameter("selectedCity");
     logger.log(Level.FINE, "requested city is " + city);
 
-    String weatherAPIKey = System.getenv(WEATHER_API_KEY);
+    String weatherAPIKey = resolveWeatherApiKey();
     String mockedKey = mockKey(weatherAPIKey);
     logger.log(Level.FINE, "weatherAPIKey is " + mockedKey);
 
@@ -241,6 +246,27 @@ public class WeatherServlet extends HttpServlet {
     doGet(request, response);
   }
 
+  private static String resolveWeatherApiKey() {
+    String key = System.getenv(WEATHER_API_KEY);
+    if (key != null && key.trim().length() > 0) {
+      return key;
+    }
+    String path = System.getenv(WEATHER_API_KEY_FILE);
+    if (path == null || path.trim().isEmpty()) {
+      path = DEFAULT_WEATHER_API_KEY_FILE;
+    }
+    try {
+      java.nio.file.Path secretFile = java.nio.file.Paths.get(path);
+      if (java.nio.file.Files.isReadable(secretFile)) {
+        return new String(java.nio.file.Files.readAllBytes(secretFile),
+            java.nio.charset.StandardCharsets.UTF_8).trim();
+      }
+    } catch (IOException | RuntimeException e) {
+      logger.log(Level.WARNING, "Unable to read weather API key secret file: " + e.getMessage());
+    }
+    return null;
+  }
+
   private static String mockKey(String toBeMocked) {
     if (toBeMocked == null) {
       return null;
@@ -253,8 +279,11 @@ public class WeatherServlet extends HttpServlet {
 
     String serverEnv = "";
 
-    serverEnv += com.ibm.websphere.runtime.ServerName.getDisplayName();
-    serverEnv += com.ibm.websphere.runtime.ServerName.getFullName();
+    String serverName = System.getenv("SERVER_NAME");
+    if (serverName == null || serverName.isEmpty()) {
+      serverName = System.getenv("HOSTNAME");
+    }
+    serverEnv += serverName != null ? serverName : "";
 
     return serverEnv;
   }
@@ -263,8 +292,14 @@ public class WeatherServlet extends HttpServlet {
 
     Hashtable ht = new Hashtable();
 
-    ht.put("java.naming.factory.initial", "com.ibm.websphere.naming.WsnInitialContextFactory");
-    ht.put("java.naming.provider.url", "corbaloc:iiop:localhost:2809");
+    String jndiFactory = System.getenv("JNDI_INITIAL_CONTEXT_FACTORY");
+    if (jndiFactory != null && !jndiFactory.isEmpty()) {
+      ht.put("java.naming.factory.initial", jndiFactory);
+    }
+    String jndiUrl = System.getenv("JNDI_PROVIDER_URL");
+    if (jndiUrl != null && !jndiUrl.isEmpty()) {
+      ht.put("java.naming.provider.url", jndiUrl);
+    }
 
     InitialContext ctx = null;
     try {
