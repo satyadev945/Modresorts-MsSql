@@ -7,7 +7,7 @@ import com.acme.modres.Constants;
 
 public class ReservationCheckerData {
   private ReservationList reservations;
-  private Date selectedDate;
+  private java.sql.Date selectedDate; // date-only value, maps to PostgreSQL DATE
   private boolean available; // changed from Boolean to boolean
 
   public ReservationCheckerData(ReservationList reservations) {
@@ -25,7 +25,7 @@ public class ReservationCheckerData {
 
   public boolean setSelectedDate(String dateStr) {
     try {
-      selectedDate = new SimpleDateFormat(Constants.DATA_FORMAT).parse(dateStr);
+      selectedDate = new java.sql.Date(new SimpleDateFormat(Constants.DATA_FORMAT).parse(dateStr).getTime());
     } catch (Exception e) {
       return false;
     }
