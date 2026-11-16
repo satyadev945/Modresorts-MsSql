@@ -17,7 +17,8 @@ public final class IOUtils {
     OutputStream outStream = null;
     try {
       initialStream = IOUtils.class.getClassLoader().getResourceAsStream(path);
-      byte[] buffer = new byte[initialStream.available()];
+      // byte[] buffer: compatible with PostgreSQL BYTEA via getBytes()/setBytes(); no VARBINARY mapping
+      final byte[] buffer = new byte[initialStream.available()];
       initialStream.read(buffer);
 
       file = File.createTempFile(path, null);
