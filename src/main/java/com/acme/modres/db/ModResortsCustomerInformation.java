@@ -1,8 +1,8 @@
 package com.acme.modres.db;
 
-import javax.annotation.Resource;
-import javax.ejb.Singleton;
-import javax.ejb.Startup;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -10,20 +10,32 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 
-@Singleton
-@Startup
+/**
+ * Spring-managed service (replaces the EJB 2.x/3.x @Singleton @Startup bean).
+ * The DataSource is supplied by Spring (e.g. HikariCP pointed at Cloud SQL via
+ * environment-driven configuration) instead of a JNDI @Resource lookup.
+ */
+@Service
 public class ModResortsCustomerInformation {
   private static final String SELECT_CUSTOMERS_QUERY = "SELECT INFO FROM CUSTOMER";
 
-  // Removing DB connection for ease of demo setup
-  // @Resource(lookup = "jdbc/ModResortsJndi")
+  // Optional: when no DataSource bean is configured the service returns an empty list.
+  @Autowired(required = false)
   private DataSource dataSource;
+
+  public void setDataSource(DataSource dataSource) {
+    this.dataSource = dataSource;
+  }
 
   public ArrayList<String> getCustomerInformation() {
     Connection conn = null;
     PreparedStatement stmt = null;
     ResultSet rs = null;
     ArrayList<String> customerInfo = new ArrayList<>();
+
+    if (dataSource == null) {
+      return customerInfo;
+    }
 
     try {
       // Get a connection from the injected data source

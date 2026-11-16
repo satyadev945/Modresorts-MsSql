@@ -1,5 +1,8 @@
 package com.acme.modres;
 
+import java.text.SimpleDateFormat;
+import java.util.TimeZone;
+
 public class Constants {
 
   public static final String BARCELONA = "Barcelona";
@@ -23,5 +26,15 @@ public class Constants {
   public final static String WUNDERGROUND_API_PART = "/forecast/geolookup/conditions/q/";
 
   public final static String DATA_FORMAT = "MM/dd/yyyy";
+
+  /**
+   * Creates a date formatter pinned to UTC so that date parsing does not depend on the
+   * server-local timezone (consistent across regions/containers).
+   */
+  public static SimpleDateFormat utcDateFormat() {
+    SimpleDateFormat sdf = new SimpleDateFormat(DATA_FORMAT);
+    sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+    return sdf;
+  }
 
 }

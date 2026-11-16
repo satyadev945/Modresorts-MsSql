@@ -1,16 +1,15 @@
 package com.acme.modres;
 
-import java.io.File;
-import java.io.FileInputStream;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.logging.Logger;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 import javax.naming.InitialContext;
@@ -25,7 +24,10 @@ import com.acme.modres.mbean.reservation.DateChecker;
 import com.acme.modres.mbean.reservation.ReservationCheckerData;
 import com.acme.modres.mbean.reservation.Reservation;
 
-import com.acme.modres.util.ZipValidator;
+import com.google.cloud.storage.BlobId;
+import com.google.cloud.storage.BlobInfo;
+import com.google.cloud.storage.Storage;
+import com.google.cloud.storage.StorageOptions;
 
 @WebServlet({ "/resorts/availability" })
 public class AvailabilityCheckerServlet extends HttpServlet {
@@ -61,8 +63,8 @@ public class AvailabilityCheckerServlet extends HttpServlet {
 
       for (Reservation reservation : reservations) {
         try {
-          Date fromDate = new SimpleDateFormat(Constants.DATA_FORMAT).parse(reservation.getFromDate());
-          Date toDate = new SimpleDateFormat(Constants.DATA_FORMAT).parse(reservation.getToDate());
+          Date fromDate = Constants.utcDateFormat().parse(reservation.getFromDate());
+          Date toDate = Constants.utcDateFormat().parse(reservation.getToDate());
           Date selectedDate = reservationCheckerData.getSelectedDate();
 
           if (selectedDate.after(fromDate) && selectedDate.before(toDate)) {
@@ -100,42 +102,47 @@ public class AvailabilityCheckerServlet extends HttpServlet {
   }
 
   protected int exportRevervations(String selectedDateStr) {
-    File fileToZip = IOUtils.getFileFromRelativePath("reservations.json");
-    String userDirectory = System.getProperty("user.home");
-    String zipPath = userDirectory + "/reservations.zip";
+    final String entryName = "reservations.json";
 
-    FileOutputStream fos;
+    // Target location in Google Cloud Storage (no local file system dependency)
+    String bucketName = System.getenv("GCS_BUCKET_NAME");
+    String objectName = System.getenv().getOrDefault("GCS_RESERVATIONS_ZIP_OBJECT", "reservations.zip");
+    if (bucketName == null || bucketName.trim().isEmpty()) {
+      logger.severe("GCS_BUCKET_NAME environment variable is not set; cannot export reservations");
+      return -1;
+    }
+
     try {
-      fos = new FileOutputStream(zipPath);
-      ZipOutputStream zipOut = new ZipOutputStream(fos);
-
-      FileInputStream fis = new FileInputStream(fileToZip);
-      ZipEntry zipEntry = new ZipEntry(fileToZip.getName());
-      zipOut.putNextEntry(zipEntry);
-
-      byte[] bytes = new byte[1024];
-      int length;
-      while ((length = fis.read(bytes)) >= 0) {
-        zipOut.write(bytes, 0, length);
+      // Build the zip in memory
+      ByteArrayOutputStream baos = new ByteArrayOutputStream();
+      try (ZipOutputStream zipOut = new ZipOutputStream(baos)) {
+        ZipEntry zipEntry = new ZipEntry(entryName);
+        zipOut.putNextEntry(zipEntry);
+        zipOut.write(IOUtils.readResourceBytes(entryName));
+        zipOut.closeEntry();
       }
-      fis.close();
+      byte[] zipBytes = baos.toByteArray();
 
-      zipOut.close();
-      fos.close();
+      // Upload to Google Cloud Storage (Storage is AutoCloseable; closed automatically)
+      byte[] stored;
+      try (Storage storage = StorageOptions.getDefaultInstance().getService()) {
+        BlobInfo blobInfo = BlobInfo.newBuilder(BlobId.of(bucketName, objectName))
+            .setContentType("application/zip").build();
+        storage.create(blobInfo, zipBytes);
 
-      // verify zip
-      ZipValidator zipValidator = new ZipValidator(new File(zipPath));
-      if (zipValidator.isValid()) {
-        return 0;
+        // verify zip by reading back from GCS
+        stored = storage.readAllBytes(BlobId.of(bucketName, objectName));
+      }
+      try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(stored))) {
+        if (zis.getNextEntry() != null) {
+          return 0;
+        }
       }
     } catch (FileNotFoundException e) {
-      // TODO Auto-generated catch block
       e.printStackTrace();
     } catch (IOException e) {
-      // TODO Auto-generated catch block
       e.printStackTrace();
     } catch (Throwable e) {
-      // TODO Auto-generated catch block
       e.printStackTrace();
     }
     return -1;

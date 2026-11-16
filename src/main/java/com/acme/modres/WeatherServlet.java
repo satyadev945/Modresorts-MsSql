@@ -1,5 +1,8 @@
 package com.acme.modres;
 
+import com.google.cloud.secretmanager.v1.AccessSecretVersionResponse;
+import com.google.cloud.secretmanager.v1.SecretManagerServiceClient;
+import com.google.cloud.secretmanager.v1.SecretVersionName;
 import com.acme.modres.db.ModResortsCustomerInformation;
 import com.acme.modres.exception.ExceptionHandler;
 import com.acme.modres.mbean.AppInfo;
@@ -23,7 +26,6 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import javax.inject.Inject;
 import javax.management.InstanceAlreadyExistsException;
 import javax.management.InstanceNotFoundException;
 import javax.management.IntrospectionException;
@@ -43,13 +45,23 @@ import javax.servlet.annotation.WebServlet;
 public class WeatherServlet extends HttpServlet {
   private static final long serialVersionUID = 1L;
 
-  @Inject
-  private ModResortsCustomerInformation customerInfo;
+  // Spring-managed service is no longer a CDI/EJB bean; instantiated directly.
+  private final ModResortsCustomerInformation customerInfo = new ModResortsCustomerInformation();
 
-  // local OS environment variable key name. The key value should provide an API
-  // key that will be used to
-  // get weather information from site: http://www.wunderground.com
+  // The weather API key (used to get weather information from
+  // http://www.wunderground.com) is stored in Google Secret Manager.
+  // The secret id is configurable through the WEATHER_API_KEY_SECRET_ID
+  // environment variable (default: weather-api-key) and the project through
+  // GCP_PROJECT_ID / GOOGLE_CLOUD_PROJECT. The secret version defaults to "latest".
+  // The legacy WEATHER_API_KEY environment variable is only used as a local
+  // development fallback when Secret Manager is not configured/available.
   private static final String WEATHER_API_KEY = "WEATHER_API_KEY";
+  private static final String WEATHER_API_KEY_SECRET_ID = "WEATHER_API_KEY_SECRET_ID";
+  private static final String WEATHER_API_KEY_SECRET_VERSION = "WEATHER_API_KEY_SECRET_VERSION";
+  private static final String DEFAULT_SECRET_ID = "weather-api-key";
+  private static final String DEFAULT_SECRET_VERSION = "latest";
+
+  private static volatile String cachedWeatherApiKey;
 
   private static final Logger logger = Logger.getLogger(WeatherServlet.class.getName());
 
@@ -106,7 +118,7 @@ public class WeatherServlet extends HttpServlet {
     String city = request.getParameter("selectedCity");
     logger.log(Level.FINE, "requested city is " + city);
 
-    String weatherAPIKey = System.getenv(WEATHER_API_KEY);
+    String weatherAPIKey = getWeatherApiKey();
     String mockedKey = mockKey(weatherAPIKey);
     logger.log(Level.FINE, "weatherAPIKey is " + mockedKey);
 
@@ -239,6 +251,42 @@ public class WeatherServlet extends HttpServlet {
       throws ServletException, IOException {
 
     doGet(request, response);
+  }
+
+  /**
+   * Retrieves the weather API key from Google Secret Manager. Falls back to the
+   * local environment variable only when Secret Manager is not configured or
+   * unavailable (local development).
+   */
+  private String getWeatherApiKey() {
+    String key = cachedWeatherApiKey;
+    if (key != null) {
+      return key;
+    }
+    String projectId = System.getenv("GCP_PROJECT_ID");
+    if (projectId == null || projectId.trim().isEmpty()) {
+      projectId = System.getenv("GOOGLE_CLOUD_PROJECT");
+    }
+    if (projectId != null && !projectId.trim().isEmpty()) {
+      String secretId = System.getenv(WEATHER_API_KEY_SECRET_ID);
+      if (secretId == null || secretId.trim().isEmpty()) {
+        secretId = DEFAULT_SECRET_ID;
+      }
+      String version = System.getenv(WEATHER_API_KEY_SECRET_VERSION);
+      if (version == null || version.trim().isEmpty()) {
+        version = DEFAULT_SECRET_VERSION;
+      }
+      try (SecretManagerServiceClient client = SecretManagerServiceClient.create()) {
+        SecretVersionName name = SecretVersionName.of(projectId.trim(), secretId.trim(), version.trim());
+        AccessSecretVersionResponse secretResponse = client.accessSecretVersion(name);
+        key = secretResponse.getPayload().getData().toStringUtf8();
+        cachedWeatherApiKey = key;
+        return key;
+      } catch (Exception e) {
+        logger.log(Level.WARNING, "Unable to read weather API key from Google Secret Manager: " + e.getMessage());
+      }
+    }
+    return System.getenv(WEATHER_API_KEY);
   }
 
   private static String mockKey(String toBeMocked) {

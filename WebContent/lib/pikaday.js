@@ -9,10 +9,35 @@
     'use strict';
 
     var moment;
+
+    // Structured (JSON) error logging compatible with GCP Cloud Logging / Error Reporting.
+    // Optional moment.js dependency failures are non-fatal but must be observable.
+    function logOptionalDependencyError(err)
+    {
+        var entry = {
+            severity: 'WARNING',
+            message: 'Pikaday: optional dependency "moment" could not be loaded: ' + (err && err.message ? err.message : String(err)),
+            component: 'pikaday',
+            '@type': 'type.googleapis.com/google.devtools.clouderrorreporting.v1beta1.ReportedErrorEvent',
+            stack_trace: err && err.stack ? err.stack : undefined
+        };
+        try {
+            if (typeof console !== 'undefined' && console.warn) {
+                console.warn(JSON.stringify(entry));
+            }
+            if (typeof process !== 'undefined' && process.env && typeof require === 'function' && process.env.GOOGLE_CLOUD_PROJECT) {
+                try {
+                    var ErrorReporting = require('@google-cloud/error-reporting').ErrorReporting;
+                    new ErrorReporting({reportMode: 'production'}).report(err);
+                } catch (reportErr) { /* error-reporting client not installed; structured log above is sufficient */ }
+            }
+        } catch (logErr) { /* logging must never break the date picker */ }
+    }
+
     if (typeof exports === 'object') {
         // CommonJS module
         // Load moment.js as an optional dependency
-        try { moment = require('moment'); } catch (e) {}
+        try { moment = require('moment'); } catch (e) { logOptionalDependencyError(e); }
         module.exports = factory(moment);
     } else if (typeof define === 'function' && define.amd) {
         // AMD. Register as an anonymous module.
@@ -20,7 +45,7 @@
         {
             // Load moment.js as an optional dependency
             var id = 'moment';
-            try { moment = req(id); } catch (e) {}
+            try { moment = req(id); } catch (e) { logOptionalDependencyError(e); }
             return factory(moment);
         });
     } else {
