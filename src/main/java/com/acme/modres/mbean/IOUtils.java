@@ -17,6 +17,7 @@ public final class IOUtils {
     OutputStream outStream = null;
     try {
       initialStream = IOUtils.class.getClassLoader().getResourceAsStream(path);
+      // byte[] buffer only; compatible with PostgreSQL BYTEA (no Types.VARBINARY used)
       byte[] buffer = new byte[initialStream.available()];
       initialStream.read(buffer);
 
