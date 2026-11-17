@@ -122,6 +122,7 @@ public class WeatherServlet extends HttpServlet {
     }
   }
 
+  // No SQL Server JDBC settings here; any datasource must use jdbc:postgresql / org.postgresql.Driver
   private void getRealTimeWeatherData(String city, String apiKey, HttpServletResponse response)
       throws ServletException, IOException {
     String resturl = null;
