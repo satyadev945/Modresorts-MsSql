@@ -25,7 +25,7 @@ public class JsonInputStream extends FileInputStream {
       try {
         is = new JsonInputStream(file);
         Gson gson = new Gson();
-        BufferedReader reader = new BufferedReader(new InputStreamReader(is));
+        BufferedReader reader = new BufferedReader(new InputStreamReader(is, java.nio.charset.StandardCharsets.UTF_8));
         jsonObject = gson.fromJson(reader, cls);
       } catch (Exception e) {
         e.printStackTrace();
