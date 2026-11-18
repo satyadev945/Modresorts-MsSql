@@ -1,6 +1,8 @@
 package com.acme.modres.mbean.reservation;
 
 import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Date;
 
 import com.acme.modres.Constants;
@@ -21,6 +23,11 @@ public class ReservationCheckerData {
 
   public Date getSelectedDate() {
     return selectedDate;
+  }
+
+  // Date-only value (PostgreSQL DATE) as java.time.LocalDate
+  public LocalDate getSelectedLocalDate() {
+    return selectedDate == null ? null : selectedDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
   }
 
   public boolean setSelectedDate(String dateStr) {

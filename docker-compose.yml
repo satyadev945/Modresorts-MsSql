@@ -18,8 +18,31 @@ services:
       REDIS_CACHE_TTL_SECONDS: "${REDIS_CACHE_TTL_SECONDS:-60}"
       JNDI_INITIAL_CONTEXT_FACTORY: "${JNDI_INITIAL_CONTEXT_FACTORY:-}"
       JNDI_PROVIDER_URL: "${JNDI_PROVIDER_URL:-}"
+      DB_URL: "jdbc:postgresql://postgres:5432/${POSTGRES_DB:-modresorts}"
+      DB_USER: "${POSTGRES_USER:-postgres}"
+      DB_PASSWORD: "${POSTGRES_PASSWORD:-}"
+    depends_on:
+      - postgres
     volumes:
       - modresorts-logs:/opt/tomcat/logs
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15
+    container_name: modresorts-postgres
+    environment:
+      POSTGRES_DB: "${POSTGRES_DB:-modresorts}"
+      POSTGRES_USER: "${POSTGRES_USER:-postgres}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-}"
+    volumes:
+      - modresorts-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - app-network
     restart: unless-stopped
@@ -30,3 +53,4 @@ networks:
 
 volumes:
   modresorts-logs:
+  modresorts-pgdata:

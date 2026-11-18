@@ -113,6 +113,7 @@ public class AvailabilityCheckerServlet extends HttpServlet {
       ZipEntry zipEntry = new ZipEntry(fileToZip.getName());
       zipOut.putNextEntry(zipEntry);
 
+      // byte[] maps directly to PostgreSQL BYTEA (no VARBINARY / Types.VARBINARY used)
       byte[] bytes = new byte[1024];
       int length;
       while ((length = fis.read(bytes)) >= 0) {
