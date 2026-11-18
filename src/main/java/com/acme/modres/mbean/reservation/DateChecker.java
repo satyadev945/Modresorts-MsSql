@@ -22,8 +22,8 @@ public class DateChecker implements Runnable {
       Date selectedDate = data.getSelectedDate();
 
       try {
-        Date fromDate = new SimpleDateFormat(Constants.DATA_FORMAT).parse(reservation.getFromDate());
-        Date toDate = new SimpleDateFormat(Constants.DATA_FORMAT).parse(reservation.getToDate());
+        Date fromDate = Constants.newDateFormat().parse(reservation.getFromDate());
+        Date toDate = Constants.newDateFormat().parse(reservation.getToDate());
         if (selectedDate.after(fromDate) && selectedDate.before(toDate)) {
           data.setAvailablility(false);
           break;

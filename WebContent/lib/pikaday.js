@@ -8,11 +8,30 @@
 {
     'use strict';
 
+    // Structured error reporting to Azure Application Insights (browser SDK global
+    // `appInsights`, or Node `applicationinsights` default client); falls back to console.
+    var reportError = function (e, operation)
+    {
+        try {
+            var props = { component: 'pikaday', operation: operation, severity: 'warning' };
+            var exception = e instanceof Error ? e : new Error(String(e));
+            var ai = (root && root.appInsights) || null;
+            if (!ai && typeof exports === 'object' && typeof require === 'function') {
+                try { ai = require('applicationinsights').defaultClient; } catch (ignore) { ai = null; }
+            }
+            if (ai && typeof ai.trackException === 'function') {
+                ai.trackException({ exception: exception, properties: props });
+            } else if (typeof console !== 'undefined' && console.warn) {
+                console.warn(JSON.stringify({ level: 'warn', message: exception.message, properties: props }));
+            }
+        } catch (ignore) { /* error reporting must never break the host application */ }
+    };
+
     var moment;
     if (typeof exports === 'object') {
         // CommonJS module
         // Load moment.js as an optional dependency
-        try { moment = require('moment'); } catch (e) {}
+        try { moment = require('moment'); } catch (e) { reportError(e, 'require-moment'); }
         module.exports = factory(moment);
     } else if (typeof define === 'function' && define.amd) {
         // AMD. Register as an anonymous module.
@@ -20,7 +39,7 @@
         {
             // Load moment.js as an optional dependency
             var id = 'moment';
-            try { moment = req(id); } catch (e) {}
+            try { moment = req(id); } catch (e) { reportError(e, 'amd-require-moment'); }
             return factory(moment);
         });
     } else {

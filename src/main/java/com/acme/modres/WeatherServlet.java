@@ -1,5 +1,8 @@
 package com.acme.modres;
 
+import com.azure.identity.DefaultAzureCredentialBuilder;
+import com.azure.security.keyvault.secrets.SecretClient;
+import com.azure.security.keyvault.secrets.SecretClientBuilder;
 import com.acme.modres.db.ModResortsCustomerInformation;
 import com.acme.modres.exception.ExceptionHandler;
 import com.acme.modres.mbean.AppInfo;
@@ -46,10 +49,13 @@ public class WeatherServlet extends HttpServlet {
   @Inject
   private ModResortsCustomerInformation customerInfo;
 
-  // local OS environment variable key name. The key value should provide an API
-  // key that will be used to
-  // get weather information from site: http://www.wunderground.com
-  private static final String WEATHER_API_KEY = "WEATHER_API_KEY";
+  // The weather API key (http://www.wunderground.com) is stored as a secret in
+  // Azure Key Vault and retrieved using Managed Identity. The vault URI comes from
+  // the AZURE_KEYVAULT_URI environment variable and the secret name from
+  // WEATHER_API_KEY_SECRET_NAME (default: "weather-api-key").
+  private static final String KEY_VAULT_URI_ENV = "AZURE_KEYVAULT_URI";
+  private static final String WEATHER_API_KEY_SECRET_NAME_ENV = "WEATHER_API_KEY_SECRET_NAME";
+  private static final String DEFAULT_WEATHER_API_KEY_SECRET_NAME = "weather-api-key";
 
   private static final Logger logger = Logger.getLogger(WeatherServlet.class.getName());
 
@@ -106,7 +112,7 @@ public class WeatherServlet extends HttpServlet {
     String city = request.getParameter("selectedCity");
     logger.log(Level.FINE, "requested city is " + city);
 
-    String weatherAPIKey = System.getenv(WEATHER_API_KEY);
+    String weatherAPIKey = getWeatherApiKeyFromKeyVault();
     String mockedKey = mockKey(weatherAPIKey);
     logger.log(Level.FINE, "weatherAPIKey is " + mockedKey);
 
@@ -239,6 +245,33 @@ public class WeatherServlet extends HttpServlet {
       throws ServletException, IOException {
 
     doGet(request, response);
+  }
+
+  /**
+   * Retrieves the weather API key from Azure Key Vault using Managed Identity
+   * (DefaultAzureCredential). Returns null if Key Vault is not configured or the
+   * secret cannot be read, in which case default weather data is served.
+   */
+  private String getWeatherApiKeyFromKeyVault() {
+    String vaultUri = System.getenv(KEY_VAULT_URI_ENV);
+    if (vaultUri == null || vaultUri.trim().isEmpty()) {
+      logger.warning(KEY_VAULT_URI_ENV + " is not set; unable to retrieve weather API key from Azure Key Vault");
+      return null;
+    }
+    String secretName = System.getenv(WEATHER_API_KEY_SECRET_NAME_ENV);
+    if (secretName == null || secretName.trim().isEmpty()) {
+      secretName = DEFAULT_WEATHER_API_KEY_SECRET_NAME;
+    }
+    try {
+      SecretClient secretClient = new SecretClientBuilder()
+          .vaultUrl(vaultUri)
+          .credential(new DefaultAzureCredentialBuilder().build())
+          .buildClient();
+      return secretClient.getSecret(secretName).getValue();
+    } catch (Exception e) {
+      logger.log(Level.WARNING, "Unable to retrieve weather API key from Azure Key Vault: " + e.getMessage());
+      return null;
+    }
   }
 
   private static String mockKey(String toBeMocked) {

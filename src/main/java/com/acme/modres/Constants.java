@@ -24,4 +24,15 @@ public class Constants {
 
   public final static String DATA_FORMAT = "MM/dd/yyyy";
 
+  /**
+   * Returns a date formatter pinned to UTC so date parsing does not depend on the
+   * server-local timezone (consistent across distributed Azure instances/regions).
+   * SimpleDateFormat is not thread-safe, so a new instance is returned on each call.
+   */
+  public static java.text.SimpleDateFormat newDateFormat() {
+    java.text.SimpleDateFormat fmt = new java.text.SimpleDateFormat(DATA_FORMAT);
+    fmt.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+    return fmt;
+  }
+
 }
