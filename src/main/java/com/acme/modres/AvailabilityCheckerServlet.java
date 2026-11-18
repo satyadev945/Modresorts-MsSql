@@ -113,7 +113,7 @@ public class AvailabilityCheckerServlet extends HttpServlet {
       }
       byte[] zipBytes = zipBuffer.toByteArray();
 
-      // verify zip
+      // verify zip (byte[] is compatible with PostgreSQL BYTEA if persisted to a DB)
       boolean valid = false;
       try (ZipInputStream zipIn = new ZipInputStream(new ByteArrayInputStream(zipBytes))) {
         valid = zipIn.getNextEntry() != null;

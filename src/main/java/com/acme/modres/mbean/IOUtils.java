@@ -17,6 +17,7 @@ public final class IOUtils {
    * (temp files) are performed, so this works on ephemeral/read-only container
    * file systems.
    */
+  // byte[] maps directly to PostgreSQL BYTEA via getBytes()/setBytes().
   public static byte[] readResourceBytes(String path) throws IOException {
     try (InputStream in = IOUtils.class.getClassLoader().getResourceAsStream(path)) {
       if (in == null) {

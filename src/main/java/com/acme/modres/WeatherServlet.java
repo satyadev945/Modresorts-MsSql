@@ -124,6 +124,7 @@ public class WeatherServlet extends HttpServlet {
           "weatherAPIKey is not found, will provide the weather data dated August 10th, 2018 for the city " + city);
       getDefaultWeatherData(city, response);
     }
+    // No SQL Server JDBC settings here; datasource config lives in application.properties (PostgreSQL).
   }
 
   private void getRealTimeWeatherData(String city, String apiKey, HttpServletResponse response)
