@@ -17,6 +17,7 @@ public final class IOUtils {
     OutputStream outStream = null;
     try {
       initialStream = IOUtils.class.getClassLoader().getResourceAsStream(path);
+      // byte[] buffer is binary data (PostgreSQL BYTEA compatible via getBytes()/setBytes())
       byte[] buffer = new byte[initialStream.available()];
       initialStream.read(buffer);
 
