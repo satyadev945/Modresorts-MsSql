@@ -1,0 +1,32 @@
+services:
+  modresorts:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: modresorts:latest
+    container_name: modresorts
+    ports:
+      - "8080:8080"
+    environment:
+      TZ: "UTC"
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dfile.encoding=UTF-8 -Duser.timezone=UTC"
+      # External services - provide via shell environment or an .env file
+      WEATHER_API_KEY: "${WEATHER_API_KEY:-}"
+      REDIS_HOST: "${REDIS_HOST:-}"
+      REDIS_PORT: "${REDIS_PORT:-6379}"
+      REDIS_PASSWORD: "${REDIS_PASSWORD:-}"
+      REDIS_CACHE_TTL_SECONDS: "${REDIS_CACHE_TTL_SECONDS:-60}"
+      JNDI_INITIAL_CONTEXT_FACTORY: "${JNDI_INITIAL_CONTEXT_FACTORY:-}"
+      JNDI_PROVIDER_URL: "${JNDI_PROVIDER_URL:-}"
+    volumes:
+      - modresorts-logs:/opt/tomcat/logs
+    networks:
+      - app-network
+    restart: unless-stopped
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  modresorts-logs:
