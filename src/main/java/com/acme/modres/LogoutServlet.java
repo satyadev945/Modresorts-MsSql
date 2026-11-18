@@ -1,11 +1,11 @@
 package com.acme.modres;
 
 import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-
-import com.ibm.websphere.security.WSSecurityHelper;
+import javax.servlet.http.HttpSession;
 
 import java.io.IOException;
 
@@ -18,7 +18,24 @@ public class LogoutServlet extends HttpServlet {
       HttpServletResponse response) throws IOException {
 
     try {
-      WSSecurityHelper.revokeSSOCookies(request, response);
+      // Portable replacement for WSSecurityHelper.revokeSSOCookies
+      request.logout();
+      HttpSession session = request.getSession(false);
+      if (session != null) {
+        session.invalidate();
+      }
+      Cookie[] cookies = request.getCookies();
+      if (cookies != null) {
+        for (Cookie cookie : cookies) {
+          String name = cookie.getName();
+          if ("LtpaToken".equals(name) || "LtpaToken2".equals(name) || "JSESSIONID".equals(name)) {
+            Cookie expired = new Cookie(name, "");
+            expired.setMaxAge(0);
+            expired.setPath("/");
+            response.addCookie(expired);
+          }
+        }
+      }
     } catch (Exception e) {
       System.err.println("[ERROR] Error logging out");
       e.printStackTrace();

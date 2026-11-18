@@ -1,6 +1,5 @@
 package com.acme.modres;
 
-import com.acme.modres.db.ModResortsCustomerInformation;
 import com.acme.modres.exception.ExceptionHandler;
 import com.acme.modres.mbean.AppInfo;
 
@@ -23,7 +22,6 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import javax.inject.Inject;
 import javax.management.InstanceAlreadyExistsException;
 import javax.management.InstanceNotFoundException;
 import javax.management.IntrospectionException;
@@ -43,8 +41,8 @@ import javax.servlet.annotation.WebServlet;
 public class WeatherServlet extends HttpServlet {
   private static final long serialVersionUID = 1L;
 
-  @Inject
-  private ModResortsCustomerInformation customerInfo;
+  // Customer information is owned by a separate service; this servlet no longer
+  // injects it in-process (unused tight coupling removed).
 
   // local OS environment variable key name. The key value should provide an API
   // key that will be used to
@@ -253,8 +251,12 @@ public class WeatherServlet extends HttpServlet {
 
     String serverEnv = "";
 
-    serverEnv += com.ibm.websphere.runtime.ServerName.getDisplayName();
-    serverEnv += com.ibm.websphere.runtime.ServerName.getFullName();
+    // Portable replacement for com.ibm.websphere.runtime.ServerName
+    String hostName = System.getenv("HOSTNAME");
+    if (hostName == null || hostName.isEmpty()) {
+      hostName = System.getProperty("server.name", "localhost");
+    }
+    serverEnv += hostName;
 
     return serverEnv;
   }
@@ -263,8 +265,14 @@ public class WeatherServlet extends HttpServlet {
 
     Hashtable ht = new Hashtable();
 
-    ht.put("java.naming.factory.initial", "com.ibm.websphere.naming.WsnInitialContextFactory");
-    ht.put("java.naming.provider.url", "corbaloc:iiop:localhost:2809");
+    String jndiFactory = System.getenv("JNDI_INITIAL_CONTEXT_FACTORY");
+    if (jndiFactory != null && !jndiFactory.isEmpty()) {
+      ht.put("java.naming.factory.initial", jndiFactory);
+    }
+    String jndiProviderUrl = System.getenv("JNDI_PROVIDER_URL");
+    if (jndiProviderUrl != null && !jndiProviderUrl.isEmpty()) {
+      ht.put("java.naming.provider.url", jndiProviderUrl);
+    }
 
     InitialContext ctx = null;
     try {
