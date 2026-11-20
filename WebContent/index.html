@@ -31,6 +31,15 @@
 
 
 <body>
+    <!-- SSR/no-JavaScript fallback. In EKS this content can be overridden by mounting a ConfigMap over this template at deploy time. -->
+    <noscript>
+        <div class="noscript-fallback">
+            <h1>MOD RESORTS</h1>
+            <p>JavaScript is disabled or failed to load. Resort search, weather and reservation features require JavaScript.</p>
+            <p>Please enable JavaScript in your browser, or contact Customer Support at 1-800-867-5409.</p>
+            <p>Available destinations: Paris, Las Vegas, Cork, San Francisco, Miami, Barcelona.</p>
+        </div>
+    </noscript>
     <header class="header">
         <div class="header--left-container">
             <img class="header--logo" src="images/m-logo.svg" alt="">

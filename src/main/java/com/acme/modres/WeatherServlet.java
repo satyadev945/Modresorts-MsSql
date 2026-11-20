@@ -46,9 +46,9 @@ public class WeatherServlet extends HttpServlet {
   @Inject
   private ModResortsCustomerInformation customerInfo;
 
-  // local OS environment variable key name. The key value should provide an API
-  // key that will be used to
-  // get weather information from site: http://www.wunderground.com
+  // Name of the externalized setting (environment variable, injected in EKS from a
+  // Kubernetes Secret/ConfigMap, or a JVM system property fallback). The value should
+  // provide an API key used to get weather information from http://www.wunderground.com
   private static final String WEATHER_API_KEY = "WEATHER_API_KEY";
 
   private static final Logger logger = Logger.getLogger(WeatherServlet.class.getName());
@@ -106,7 +106,7 @@ public class WeatherServlet extends HttpServlet {
     String city = request.getParameter("selectedCity");
     logger.log(Level.FINE, "requested city is " + city);
 
-    String weatherAPIKey = System.getenv(WEATHER_API_KEY);
+    String weatherAPIKey = resolveWeatherApiKey();
     String mockedKey = mockKey(weatherAPIKey);
     logger.log(Level.FINE, "weatherAPIKey is " + mockedKey);
 
@@ -241,6 +241,14 @@ public class WeatherServlet extends HttpServlet {
     doGet(request, response);
   }
 
+  private static String resolveWeatherApiKey() {
+    String key = System.getenv(WEATHER_API_KEY);
+    if (key == null || key.trim().isEmpty()) {
+      key = System.getProperty(WEATHER_API_KEY);
+    }
+    return key;
+  }
+
   private static String mockKey(String toBeMocked) {
     if (toBeMocked == null) {
       return null;
@@ -253,8 +261,12 @@ public class WeatherServlet extends HttpServlet {
 
     String serverEnv = "";
 
-    serverEnv += com.ibm.websphere.runtime.ServerName.getDisplayName();
-    serverEnv += com.ibm.websphere.runtime.ServerName.getFullName();
+    // Portable replacement for the WebSphere ServerName API: use container/host identity
+    String serverName = System.getenv("SERVER_NAME");
+    if (serverName == null || serverName.isEmpty()) {
+      serverName = System.getenv("HOSTNAME");
+    }
+    serverEnv += (serverName != null ? serverName : "localhost");
 
     return serverEnv;
   }
@@ -263,8 +275,18 @@ public class WeatherServlet extends HttpServlet {
 
     Hashtable ht = new Hashtable();
 
-    ht.put("java.naming.factory.initial", "com.ibm.websphere.naming.WsnInitialContextFactory");
-    ht.put("java.naming.provider.url", "corbaloc:iiop:localhost:2809");
+    // No RMI/JNDI registry is assumed in containers; a remote naming provider is
+    // used only when explicitly configured (e.g. Kubernetes Service DNS name).
+    String jndiFactory = System.getenv("JNDI_INITIAL_CONTEXT_FACTORY");
+    if (jndiFactory != null && !jndiFactory.isEmpty()) {
+      ht.put("java.naming.factory.initial", jndiFactory);
+    }
+    String jndiUrl = System.getenv("JNDI_PROVIDER_URL");
+    if (jndiUrl == null || jndiUrl.isEmpty()) {
+      logger.info("JNDI_PROVIDER_URL not set; skipping remote naming context (RMI registry not required).");
+      return null;
+    }
+    ht.put("java.naming.provider.url", jndiUrl);
 
     InitialContext ctx = null;
     try {
