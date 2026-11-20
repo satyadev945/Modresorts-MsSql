@@ -51,6 +51,11 @@ public class WeatherServlet extends HttpServlet {
   // get weather information from site: http://www.wunderground.com
   private static final String WEATHER_API_KEY = "WEATHER_API_KEY";
 
+  // Optional env var: base URL of an independently deployed weather microservice
+  // (e.g. http://weather-service:9080/resorts/weather). When set, this servlet
+  // delegates weather lookups to it instead of handling them in-process.
+  private static final String WEATHER_SERVICE_URL = "WEATHER_SERVICE_URL";
+
   private static final Logger logger = Logger.getLogger(WeatherServlet.class.getName());
 
   private static InitialContext context;
@@ -106,6 +111,13 @@ public class WeatherServlet extends HttpServlet {
     String city = request.getParameter("selectedCity");
     logger.log(Level.FINE, "requested city is " + city);
 
+    String weatherServiceUrl = System.getenv(WEATHER_SERVICE_URL);
+    if (weatherServiceUrl != null && weatherServiceUrl.trim().length() > 0) {
+      logger.info("Delegating weather request for city " + city + " to external weather service");
+      getRemoteServiceWeatherData(city, weatherServiceUrl.trim(), response);
+      return;
+    }
+
     String weatherAPIKey = System.getenv(WEATHER_API_KEY);
     String mockedKey = mockKey(weatherAPIKey);
     logger.log(Level.FINE, "weatherAPIKey is " + mockedKey);
@@ -117,6 +129,31 @@ public class WeatherServlet extends HttpServlet {
       logger.info(
           "weatherAPIKey is not found, will provide the weather data dated August 10th, 2018 for the city " + city);
       getDefaultWeatherData(city, response);
+    }
+  }
+
+  private void getRemoteServiceWeatherData(String city, String serviceUrl, HttpServletResponse response)
+      throws ServletException, IOException {
+    String target = serviceUrl + (serviceUrl.contains("?") ? "&" : "?") + "selectedCity="
+        + java.net.URLEncoder.encode(city == null ? "" : city, "UTF-8");
+    HttpURLConnection con = (HttpURLConnection) new URL(target).openConnection();
+    con.setRequestMethod("GET");
+    int responseCode = con.getResponseCode();
+    if (responseCode >= 200 && responseCode < 300) {
+      StringBuilder body = new StringBuilder();
+      try (BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream()))) {
+        String line;
+        while ((line = in.readLine()) != null) {
+          body.append(line);
+        }
+      }
+      response.setContentType("application/json");
+      ServletOutputStream out = response.getOutputStream();
+      out.print(body.toString());
+      out.close();
+    } else {
+      String errorMsg = "Weather service " + serviceUrl + " returned an error response: " + responseCode;
+      ExceptionHandler.handleException(null, errorMsg, logger);
     }
   }
 
@@ -253,8 +290,13 @@ public class WeatherServlet extends HttpServlet {
 
     String serverEnv = "";
 
-    serverEnv += com.ibm.websphere.runtime.ServerName.getDisplayName();
-    serverEnv += com.ibm.websphere.runtime.ServerName.getFullName();
+    String displayName = System.getenv("SERVER_DISPLAY_NAME");
+    String fullName = System.getenv("SERVER_FULL_NAME");
+    if (displayName == null || displayName.isEmpty()) {
+      displayName = System.getenv("HOSTNAME");
+    }
+    serverEnv += (displayName != null ? displayName : "");
+    serverEnv += (fullName != null ? fullName : "");
 
     return serverEnv;
   }
@@ -263,8 +305,14 @@ public class WeatherServlet extends HttpServlet {
 
     Hashtable ht = new Hashtable();
 
-    ht.put("java.naming.factory.initial", "com.ibm.websphere.naming.WsnInitialContextFactory");
-    ht.put("java.naming.provider.url", "corbaloc:iiop:localhost:2809");
+    String jndiFactory = System.getenv("JNDI_INITIAL_CONTEXT_FACTORY");
+    String jndiUrl = System.getenv("JNDI_PROVIDER_URL");
+    if (jndiFactory != null && !jndiFactory.isEmpty()) {
+      ht.put("java.naming.factory.initial", jndiFactory);
+    }
+    if (jndiUrl != null && !jndiUrl.isEmpty()) {
+      ht.put("java.naming.provider.url", jndiUrl);
+    }
 
     InitialContext ctx = null;
     try {
