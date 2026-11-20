@@ -1,25 +1,34 @@
-# ---------- Stage 1: strip unused CSS with PurgeCSS ----------
-FROM node:20-alpine AS css-purge
-WORKDIR /build
-RUN npm install -g purgecss@6
-COPY WebContent/ WebContent/
-COPY purgecss.config.js .
-RUN purgecss --config purgecss.config.js
+# ---------- Stage 1: build the application ----------
+FROM maven:3.9.4-eclipse-temurin-8 AS builder
+WORKDIR /workspace
 
-# ---------- Stage 2: build the application ----------
-FROM maven:3.9-eclipse-temurin-17 AS build
-WORKDIR /app
+# Cache dependencies: copy the POM first
 COPY pom.xml .
 RUN mvn -B -q dependency:go-offline
+
+# Copy sources and static web content (WebContent is packaged as META-INF/resources)
 COPY src/ src/
 COPY WebContent/ WebContent/
-# Replace original stylesheet with the purged one
-COPY --from=css-purge /build/purged-css/styles.css WebContent/styles.css
-RUN mvn -B -q package -DskipTests
+RUN mvn -B clean package -DskipTests
 
-# ---------- Stage 3: minimal runtime image ----------
-FROM eclipse-temurin:17-jre-alpine
+# ---------- Stage 2: runtime image ----------
+FROM eclipse-temurin:8-jre
 WORKDIR /app
-COPY --from=build /app/target/modresorts-*.jar app.jar
+
+ENV TZ=UTC \
+    LANG=C.UTF-8 \
+    JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dfile.encoding=UTF-8 -Djava.security.egd=file:/dev/./urandom" \
+    SPRING_PROFILES_ACTIVE=docker \
+    SERVER_PORT=8080
+
+# Non-root user
+RUN groupadd -r app && useradd -r -g app -d /app -s /usr/sbin/nologin app
+
+COPY --from=builder /workspace/target/modresorts-*.jar /app/app.jar
+RUN chown -R app:app /app
+
+USER app
 EXPOSE 8080
-ENTRYPOINT ["java","-jar","/app/app.jar"]
+
+# exec so that the JVM receives SIGTERM for graceful shutdown
+ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar /app/app.jar"]
