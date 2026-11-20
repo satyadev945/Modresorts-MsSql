@@ -1,0 +1,34 @@
+version: "3.8"
+
+services:
+  modresorts:
+    image: modresorts:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: modresorts
+    ports:
+      - "8080:8080"
+    environment:
+      TZ: UTC
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Xms256m -Dfile.encoding=UTF-8 -Duser.timezone=UTC"
+      # Optional external service configuration (read via System.getenv by the app)
+      WEATHER_API_KEY: "${WEATHER_API_KEY:-}"
+      WEATHER_SERVICE_URL: "${WEATHER_SERVICE_URL:-}"
+      SERVER_DISPLAY_NAME: "${SERVER_DISPLAY_NAME:-}"
+      SERVER_FULL_NAME: "${SERVER_FULL_NAME:-}"
+      JNDI_INITIAL_CONTEXT_FACTORY: "${JNDI_INITIAL_CONTEXT_FACTORY:-}"
+      JNDI_PROVIDER_URL: "${JNDI_PROVIDER_URL:-}"
+    volumes:
+      - ./config:/app/config
+      - app-data:/home/app
+    networks:
+      - app-network
+    restart: unless-stopped
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  app-data:
