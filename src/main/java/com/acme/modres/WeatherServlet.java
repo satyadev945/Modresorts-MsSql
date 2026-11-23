@@ -49,7 +49,10 @@ public class WeatherServlet extends HttpServlet {
   // local OS environment variable key name. The key value should provide an API
   // key that will be used to
   // get weather information from site: http://www.wunderground.com
-  private static final String WEATHER_API_KEY = "WEATHER_API_KEY";
+  // The env var name itself is overridable (WEATHER_API_KEY_ENV_NAME) so the weather
+  // component can be deployed as an independent EKS microservice whose Deployment
+  // injects its own ConfigMap/Secret entry.
+  private static final String WEATHER_API_KEY = System.getenv().getOrDefault("WEATHER_API_KEY_ENV_NAME", "WEATHER_API_KEY");
 
   private static final Logger logger = Logger.getLogger(WeatherServlet.class.getName());
 
@@ -253,8 +256,10 @@ public class WeatherServlet extends HttpServlet {
 
     String serverEnv = "";
 
-    serverEnv += com.ibm.websphere.runtime.ServerName.getDisplayName();
-    serverEnv += com.ibm.websphere.runtime.ServerName.getFullName();
+    // Portable replacement for WebSphere ServerName: use container-provided env vars
+    String serverName = System.getenv().getOrDefault("SERVER_NAME",
+        System.getenv().getOrDefault("HOSTNAME", "localhost"));
+    serverEnv += serverName;
 
     return serverEnv;
   }
@@ -263,8 +268,13 @@ public class WeatherServlet extends HttpServlet {
 
     Hashtable ht = new Hashtable();
 
-    ht.put("java.naming.factory.initial", "com.ibm.websphere.naming.WsnInitialContextFactory");
-    ht.put("java.naming.provider.url", "corbaloc:iiop:localhost:2809");
+    ht.put("java.naming.factory.initial",
+        System.getenv().getOrDefault("JNDI_INITIAL_CONTEXT_FACTORY", "org.apache.naming.java.javaURLContextFactory"));
+    // No hardcoded RMI/IIOP endpoint; provide a service URL (e.g. Kubernetes Service DNS) via env var
+    String providerUrl = System.getenv("JNDI_PROVIDER_URL");
+    if (providerUrl != null && !providerUrl.isEmpty()) {
+      ht.put("java.naming.provider.url", providerUrl);
+    }
 
     InitialContext ctx = null;
     try {
