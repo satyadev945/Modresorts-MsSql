@@ -1,0 +1,33 @@
+version: "3.8"
+
+services:
+  testcomp1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: testcomp1:latest
+    container_name: testcomp1
+    ports:
+      - "8080:8080"
+    environment:
+      - TZ=UTC
+      - JAVA_OPTS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dfile.encoding=UTF-8 -Duser.timezone=UTC
+      # External Redis (ElastiCache) - provided separately
+      - REDIS_HOST=${REDIS_HOST:-}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      # Weather API configuration
+      - WEATHER_API_KEY_NAME=${WEATHER_API_KEY_NAME:-WEATHER_API_KEY}
+      - WEATHER_API_KEY=${WEATHER_API_KEY:-}
+      - SERVER_DISPLAY_NAME=${SERVER_DISPLAY_NAME:-testcomp1}
+    volumes:
+      - tomcat-logs:/opt/tomcat/logs
+    networks:
+      - app-network
+    restart: unless-stopped
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  tomcat-logs:
