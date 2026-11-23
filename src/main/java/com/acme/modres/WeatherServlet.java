@@ -51,6 +51,12 @@ public class WeatherServlet extends HttpServlet {
   // get weather information from site: http://www.wunderground.com
   private static final String WEATHER_API_KEY = "WEATHER_API_KEY";
 
+  // Optional environment variable pointing to an independently deployed weather
+  // microservice (e.g. a Kubernetes Service DNS name such as
+  // http://weather-service:8080/weather). When set, weather requests are
+  // delegated to that service instead of being handled in-process.
+  private static final String WEATHER_SERVICE_URL = "WEATHER_SERVICE_URL";
+
   private static final Logger logger = Logger.getLogger(WeatherServlet.class.getName());
 
   private static InitialContext context;
@@ -106,6 +112,13 @@ public class WeatherServlet extends HttpServlet {
     String city = request.getParameter("selectedCity");
     logger.log(Level.FINE, "requested city is " + city);
 
+    String weatherServiceUrl = System.getenv(WEATHER_SERVICE_URL);
+    if (weatherServiceUrl != null && weatherServiceUrl.trim().length() > 0) {
+      logger.info("WEATHER_SERVICE_URL is set, delegating weather request for city " + city + " to weather service");
+      delegateToWeatherService(weatherServiceUrl.trim(), city, response);
+      return;
+    }
+
     String weatherAPIKey = System.getenv(WEATHER_API_KEY);
     String mockedKey = mockKey(weatherAPIKey);
     logger.log(Level.FINE, "weatherAPIKey is " + mockedKey);
@@ -117,6 +130,31 @@ public class WeatherServlet extends HttpServlet {
       logger.info(
           "weatherAPIKey is not found, will provide the weather data dated August 10th, 2018 for the city " + city);
       getDefaultWeatherData(city, response);
+    }
+  }
+
+  private void delegateToWeatherService(String serviceUrl, String city, HttpServletResponse response)
+      throws ServletException, IOException {
+    String target = serviceUrl + (serviceUrl.contains("?") ? "&" : "?") + "selectedCity="
+        + java.net.URLEncoder.encode(city == null ? "" : city, "UTF-8");
+    HttpURLConnection con = (HttpURLConnection) new URL(target).openConnection();
+    con.setRequestMethod("GET");
+    int responseCode = con.getResponseCode();
+    if (responseCode >= 200 && responseCode < 300) {
+      StringBuilder body = new StringBuilder();
+      try (BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream()))) {
+        String line;
+        while ((line = in.readLine()) != null) {
+          body.append(line);
+        }
+      }
+      response.setContentType("application/json");
+      ServletOutputStream out = response.getOutputStream();
+      out.print(body.toString());
+      out.close();
+    } else {
+      String errorMsg = "Weather service call " + serviceUrl + " returns an error response: " + responseCode;
+      ExceptionHandler.handleException(null, errorMsg, logger);
     }
   }
 
@@ -253,8 +291,11 @@ public class WeatherServlet extends HttpServlet {
 
     String serverEnv = "";
 
-    serverEnv += com.ibm.websphere.runtime.ServerName.getDisplayName();
-    serverEnv += com.ibm.websphere.runtime.ServerName.getFullName();
+    String serverName = System.getenv("SERVER_NAME");
+    if (serverName == null || serverName.isEmpty()) {
+      serverName = System.getenv("HOSTNAME");
+    }
+    serverEnv += (serverName != null ? serverName : "");
 
     return serverEnv;
   }
@@ -263,8 +304,14 @@ public class WeatherServlet extends HttpServlet {
 
     Hashtable ht = new Hashtable();
 
-    ht.put("java.naming.factory.initial", "com.ibm.websphere.naming.WsnInitialContextFactory");
-    ht.put("java.naming.provider.url", "corbaloc:iiop:localhost:2809");
+    String namingFactory = System.getenv("JNDI_INITIAL_CONTEXT_FACTORY");
+    if (namingFactory != null && !namingFactory.isEmpty()) {
+      ht.put("java.naming.factory.initial", namingFactory);
+    }
+    String providerUrl = System.getenv("JNDI_PROVIDER_URL");
+    if (providerUrl != null && !providerUrl.isEmpty()) {
+      ht.put("java.naming.provider.url", providerUrl);
+    }
 
     InitialContext ctx = null;
     try {
