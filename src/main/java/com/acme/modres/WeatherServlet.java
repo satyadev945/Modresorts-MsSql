@@ -49,7 +49,12 @@ public class WeatherServlet extends HttpServlet {
   // local OS environment variable key name. The key value should provide an API
   // key that will be used to
   // get weather information from site: http://www.wunderground.com
-  private static final String WEATHER_API_KEY = "WEATHER_API_KEY";
+  // The env var name itself is configurable (WEATHER_API_KEY_ENV_NAME) so the
+  // weather component can be deployed as an independent EKS microservice whose
+  // Deployment/ConfigMap/Secret supplies the key under any name.
+  private static final String WEATHER_API_KEY = System.getenv("WEATHER_API_KEY_ENV_NAME") != null
+      && !System.getenv("WEATHER_API_KEY_ENV_NAME").trim().isEmpty()
+          ? System.getenv("WEATHER_API_KEY_ENV_NAME").trim() : "WEATHER_API_KEY";
 
   private static final Logger logger = Logger.getLogger(WeatherServlet.class.getName());
 
@@ -253,8 +258,11 @@ public class WeatherServlet extends HttpServlet {
 
     String serverEnv = "";
 
-    serverEnv += com.ibm.websphere.runtime.ServerName.getDisplayName();
-    serverEnv += com.ibm.websphere.runtime.ServerName.getFullName();
+    String serverName = System.getenv("SERVER_NAME");
+    if (serverName == null || serverName.isEmpty()) {
+      serverName = System.getenv("HOSTNAME");
+    }
+    serverEnv += serverName != null ? serverName : "";
 
     return serverEnv;
   }
@@ -263,8 +271,14 @@ public class WeatherServlet extends HttpServlet {
 
     Hashtable ht = new Hashtable();
 
-    ht.put("java.naming.factory.initial", "com.ibm.websphere.naming.WsnInitialContextFactory");
-    ht.put("java.naming.provider.url", "corbaloc:iiop:localhost:2809");
+    String jndiFactory = System.getenv("JNDI_INITIAL_CONTEXT_FACTORY");
+    String jndiUrl = System.getenv("JNDI_PROVIDER_URL");
+    if (jndiFactory != null && !jndiFactory.isEmpty()) {
+      ht.put("java.naming.factory.initial", jndiFactory);
+    }
+    if (jndiUrl != null && !jndiUrl.isEmpty()) {
+      ht.put("java.naming.provider.url", jndiUrl);
+    }
 
     InitialContext ctx = null;
     try {

@@ -1,17 +1,19 @@
 package com.acme.modres.db;
 
 import javax.annotation.Resource;
-import javax.ejb.Singleton;
-import javax.ejb.Startup;
+import javax.ejb.Stateless;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.List;
 
-@Singleton
-@Startup
+import redis.clients.jedis.Jedis;
+
+// Stateless bean: no per-instance state is held; shared state lives in Redis (ElastiCache)
+@Stateless
 public class ModResortsCustomerInformation {
   private static final String SELECT_CUSTOMERS_QUERY = "SELECT INFO FROM CUSTOMER";
 
@@ -19,7 +21,42 @@ public class ModResortsCustomerInformation {
   // @Resource(lookup = "jdbc/ModResortsJndi")
   private DataSource dataSource;
 
+  // Shared state externalized to Redis (ElastiCache) so all pod replicas see the same data
+  private static final String REDIS_HOST = System.getenv().getOrDefault("REDIS_HOST", "localhost");
+  private static final int REDIS_PORT = Integer.parseInt(System.getenv().getOrDefault("REDIS_PORT", "6379"));
+  private static final String CACHE_KEY = "modres:customer-info";
+  private static final int CACHE_TTL_SECONDS = Integer.parseInt(System.getenv().getOrDefault("REDIS_CACHE_TTL", "300"));
+
+  private ArrayList<String> readFromCache() {
+    try (Jedis jedis = new Jedis(REDIS_HOST, REDIS_PORT)) {
+      List<String> cached = jedis.lrange(CACHE_KEY, 0, -1);
+      if (cached != null && !cached.isEmpty()) {
+        return new ArrayList<>(cached);
+      }
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+    return null;
+  }
+
+  private void writeToCache(ArrayList<String> data) {
+    if (data.isEmpty()) {
+      return;
+    }
+    try (Jedis jedis = new Jedis(REDIS_HOST, REDIS_PORT)) {
+      jedis.del(CACHE_KEY);
+      jedis.rpush(CACHE_KEY, data.toArray(new String[0]));
+      jedis.expire(CACHE_KEY, CACHE_TTL_SECONDS);
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+  }
+
   public ArrayList<String> getCustomerInformation() {
+    ArrayList<String> cachedInfo = readFromCache();
+    if (cachedInfo != null) {
+      return cachedInfo;
+    }
     Connection conn = null;
     PreparedStatement stmt = null;
     ResultSet rs = null;
@@ -54,6 +91,7 @@ public class ModResortsCustomerInformation {
         e.printStackTrace();
       }
     }
+    writeToCache(customerInfo);
     return customerInfo;
   }
 }
