@@ -12,7 +12,7 @@ RUN mkdir -p /build/purged && \
       --output /build/purged/
 
 # ---- Stage 2: build the application with purged CSS ----
-FROM maven:3.9-eclipse-temurin-8 AS build
+FROM maven:3.9.4-eclipse-temurin-8 AS builder
 WORKDIR /app
 COPY pom.xml ./
 RUN mvn -B -q dependency:go-offline || true
@@ -20,11 +20,20 @@ COPY src ./src
 COPY WebContent ./WebContent
 # Replace original stylesheet with the purged version
 COPY --from=css-purge /build/purged/styles.css ./WebContent/styles.css
-RUN mvn -B -q package -DskipTests
+RUN mvn -B clean package -DskipTests
 
-# ---- Stage 3: minimal runtime image ----
-FROM eclipse-temurin:8-jre-alpine
+# ---- Stage 3: runtime image ----
+FROM eclipse-temurin:8-jdk-alpine
+ENV TZ=UTC \
+    LANG=C.UTF-8 \
+    SERVER_PORT=8080 \
+    SPRING_PROFILES_ACTIVE=docker \
+    ENABLE_JMX_MBEAN=false \
+    JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Xms256m -Dfile.encoding=UTF-8 -Duser.timezone=UTC -Djava.security.egd=file:/dev/./urandom"
 WORKDIR /app
-COPY --from=build /app/target/modresorts-2.0.0.war /app/app.war
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+COPY --from=builder --chown=appuser:appgroup /app/target/modresorts-2.0.0.war /app/app.war
+USER appuser
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "/app/app.war"]
+# exec form of sh -c so JAVA_OPTS expands and java receives SIGTERM for graceful shutdown
+ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar /app/app.war"]
