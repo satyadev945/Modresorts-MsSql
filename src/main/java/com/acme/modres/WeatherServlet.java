@@ -46,10 +46,9 @@ public class WeatherServlet extends HttpServlet {
   @Inject
   private ModResortsCustomerInformation customerInfo;
 
-  // local OS environment variable key name. The key value should provide an API
-  // key that will be used to
-  // get weather information from site: http://www.wunderground.com
-  private static final String WEATHER_API_KEY = "WEATHER_API_KEY";
+  // The weather API key (used to get weather information from
+  // http://www.wunderground.com) is retrieved from AWS Secrets Manager via
+  // SecretsProvider; the secret id is supplied by env var WEATHER_API_SECRET_ID.
 
   private static final Logger logger = Logger.getLogger(WeatherServlet.class.getName());
 
@@ -106,7 +105,7 @@ public class WeatherServlet extends HttpServlet {
     String city = request.getParameter("selectedCity");
     logger.log(Level.FINE, "requested city is " + city);
 
-    String weatherAPIKey = System.getenv(WEATHER_API_KEY);
+    String weatherAPIKey = SecretsProvider.getWeatherApiKey();
     String mockedKey = mockKey(weatherAPIKey);
     logger.log(Level.FINE, "weatherAPIKey is " + mockedKey);
 
