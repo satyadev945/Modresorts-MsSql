@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: testcomp1-service
+  namespace: testcomp1
+  labels:
+    app: testcomp1
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+      protocol: TCP
+  selector:
+    app: testcomp1
