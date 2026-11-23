@@ -1,0 +1,12 @@
+{
+  "name": "modresorts-web-assets",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Build-time tooling to strip unused CSS from the container image",
+  "scripts": {
+    "purgecss": "purgecss --config ./purgecss.config.js --output ./purged-css"
+  },
+  "devDependencies": {
+    "purgecss": "5.0.0"
+  }
+}

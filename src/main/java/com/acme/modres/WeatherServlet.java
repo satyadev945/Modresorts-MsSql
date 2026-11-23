@@ -53,7 +53,8 @@ public class WeatherServlet extends HttpServlet {
 
   private static final Logger logger = Logger.getLogger(WeatherServlet.class.getName());
 
-  private static InitialContext context;
+  // Per-instance JNDI context configured from environment variables (no shared static state)
+  private InitialContext context;
 
   MBeanServer server;
   ObjectName weatherON;
@@ -253,8 +254,11 @@ public class WeatherServlet extends HttpServlet {
 
     String serverEnv = "";
 
-    serverEnv += com.ibm.websphere.runtime.ServerName.getDisplayName();
-    serverEnv += com.ibm.websphere.runtime.ServerName.getFullName();
+    // Portable replacement for WebSphere ServerName API: use container environment
+    String hostName = System.getenv("HOSTNAME");
+    serverEnv += (hostName != null) ? hostName : "";
+    String serverName = System.getenv("SERVER_NAME");
+    serverEnv += (serverName != null) ? serverName : "";
 
     return serverEnv;
   }
@@ -263,8 +267,14 @@ public class WeatherServlet extends HttpServlet {
 
     Hashtable ht = new Hashtable();
 
-    ht.put("java.naming.factory.initial", "com.ibm.websphere.naming.WsnInitialContextFactory");
-    ht.put("java.naming.provider.url", "corbaloc:iiop:localhost:2809");
+    String jndiFactory = System.getenv("JNDI_INITIAL_CONTEXT_FACTORY");
+    if (jndiFactory != null && !jndiFactory.isEmpty()) {
+      ht.put("java.naming.factory.initial", jndiFactory);
+    }
+    String providerUrl = System.getenv("JNDI_PROVIDER_URL");
+    if (providerUrl != null && !providerUrl.isEmpty()) {
+      ht.put("java.naming.provider.url", providerUrl);
+    }
 
     InitialContext ctx = null;
     try {

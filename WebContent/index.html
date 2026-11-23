@@ -31,6 +31,15 @@
 
 
 <body>
+    <!-- SSR/no-JS fallback. In EKS this block can be overridden by mounting a ConfigMap
+         (e.g. key "noscript.html") over the template at deploy time. -->
+    <noscript>
+        <div class="noscript-fallback" role="alert">
+            <p>MOD RESORTS: JavaScript is disabled or failed to load. Some interactive features
+                (date picker, weather, reservations) are unavailable.</p>
+            <p><a href="login.jsp">Log in</a> to continue using the basic site.</p>
+        </div>
+    </noscript>
     <header class="header">
         <div class="header--left-container">
             <img class="header--logo" src="images/m-logo.svg" alt="">
