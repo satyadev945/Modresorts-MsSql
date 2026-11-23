@@ -1,0 +1,30 @@
+version: "3.8"
+
+services:
+  testcomp1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: testcomp1:latest
+    container_name: testcomp1
+    ports:
+      - "8080:8080"
+    environment:
+      TZ: "UTC"
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Xms256m -Dfile.encoding=UTF-8 -Duser.timezone=UTC"
+      # Optional external service configuration
+      WEATHER_API_KEY: "${WEATHER_API_KEY:-}"
+      WEATHER_SERVICE_URL: "${WEATHER_SERVICE_URL:-}"
+      SERVER_NAME: "${SERVER_NAME:-testcomp1}"
+    volumes:
+      - app-logs:/usr/local/tomcat/logs
+    networks:
+      - app-network
+    restart: unless-stopped
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  app-logs:
