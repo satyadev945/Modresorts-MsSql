@@ -124,20 +124,20 @@ public class WeatherServlet extends HttpServlet {
   private void getRealTimeWeatherData(String city, String apiKey, HttpServletResponse response)
       throws ServletException, IOException {
     String resturl = null;
-    String resturlbase = Constants.WUNDERGROUND_API_PREFIX + apiKey + Constants.WUNDERGROUND_API_PART;
+    final String resturlbase = Constants.WUNDERGROUND_API_PREFIX + apiKey + Constants.WUNDERGROUND_API_PART;
 
     if (Constants.PARIS.equals(city)) {
-      resturl = resturlbase + "France/Paris.json";
+      resturl = resturlbase.concat("France/Paris.json");
     } else if (Constants.LAS_VEGAS.equals(city)) {
-      resturl = resturlbase + "NV/Las_Vegas.json";
+      resturl = resturlbase.concat("NV/Las_Vegas.json");
     } else if (Constants.SAN_FRANCISCO.equals(city)) {
-      resturl = resturlbase + "/CA/San_Francisco.json";
+      resturl = resturlbase.concat("/CA/San_Francisco.json");
     } else if (Constants.MIAMI.equals(city)) {
-      resturl = resturlbase + "FL/Miami.json";
+      resturl = resturlbase.concat("FL/Miami.json");
     } else if (Constants.CORK.equals(city)) {
-      resturl = resturlbase + "ireland/cork.json";
+      resturl = resturlbase.concat("ireland/cork.json");
     } else if (Constants.BARCELONA.equals(city)) {
-      resturl = resturlbase + "Spain/Barcelona.json";
+      resturl = resturlbase.concat("Spain/Barcelona.json");
     } else {
       String errorMsg = "Sorry, the weather information for your selected city: " + city +
           " is not available.  Valid selections are: " + Constants.SUPPORTED_CITIES;

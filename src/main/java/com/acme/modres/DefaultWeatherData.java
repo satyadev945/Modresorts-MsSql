@@ -66,7 +66,8 @@ public class DefaultWeatherData {
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     try {
       inputStream = getClass().getClassLoader().getResourceAsStream(dataFileName);
-      byte[] buf = new byte[4096];
+      final int bufSize = 4096;
+      byte[] buf = new byte[bufSize];
       for (int n; 0 < (n = inputStream.read(buf));) {
         out.write(buf, 0, n);
       }

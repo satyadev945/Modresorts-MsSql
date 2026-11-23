@@ -17,9 +17,22 @@ services:
       JNDI_INITIAL_CONTEXT_FACTORY: "${JNDI_INITIAL_CONTEXT_FACTORY:-}"
       JNDI_PROVIDER_URL: "${JNDI_PROVIDER_URL:-}"
       SERVER_NAME: "${SERVER_NAME:-modresorts}"
+    depends_on:
+      - postgres
     volumes:
       - modresorts-logs:/opt/tomcat/logs
     restart: unless-stopped
+    networks:
+      - app-network
+
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: "${POSTGRES_DB}"
+      POSTGRES_USER: "${POSTGRES_USER}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+    ports:
+      - "5432:5432"
     networks:
       - app-network
 
