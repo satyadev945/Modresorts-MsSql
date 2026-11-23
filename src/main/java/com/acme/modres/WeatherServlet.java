@@ -125,6 +125,8 @@ public class WeatherServlet extends HttpServlet {
     }
   }
 
+  // No SQL Server datasource is configured here; if one is added use
+  // jdbc:postgresql://host:5432/db with org.postgresql.Driver (HikariCP pool).
   private void getRealTimeWeatherData(String city, String apiKey, HttpServletResponse response)
       throws ServletException, IOException {
     String resturl = null;
