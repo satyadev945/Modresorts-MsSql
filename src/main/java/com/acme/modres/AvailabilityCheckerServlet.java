@@ -115,6 +115,7 @@ public class AvailabilityCheckerServlet extends HttpServlet {
         return -1;
       }
 
+      // byte[] maps to PostgreSQL BYTEA (setBytes/getBytes; Types.BINARY, never VARBINARY)
       // build the zip in memory instead of writing to the local file system
       byte[] reservationsJson = IOUtils.getBytesFromRelativePath("reservations.json");
       byte[] zipBytes;

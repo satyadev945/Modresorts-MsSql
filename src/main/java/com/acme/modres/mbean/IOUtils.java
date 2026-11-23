@@ -18,6 +18,7 @@ public final class IOUtils {
    * Reads a classpath resource fully into memory. No local file system writes
    * (temp files) are performed, so this is safe for ephemeral/containerized runtimes.
    */
+  // byte[] maps to PostgreSQL BYTEA (setBytes/getBytes; Types.BINARY, never VARBINARY)
   public static byte[] getBytesFromRelativePath(String path) throws IOException {
     try (InputStream in = IOUtils.class.getClassLoader().getResourceAsStream(path)) {
       if (in == null) {

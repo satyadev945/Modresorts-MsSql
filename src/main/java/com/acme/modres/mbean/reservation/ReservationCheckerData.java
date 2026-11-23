@@ -5,6 +5,7 @@ import java.time.format.DateTimeFormatter;
 
 import com.acme.modres.Constants;
 
+// Date-only values use java.time.LocalDate, matching PostgreSQL DATE
 public class ReservationCheckerData {
   private ReservationList reservations;
   private LocalDate selectedDate;
