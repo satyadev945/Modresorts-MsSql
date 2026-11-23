@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: weather-service-config
+data:
+  WEATHER_API_KEY_NAME: "WEATHER_API_KEY"
+  NOSCRIPT_FALLBACK_MESSAGE: "JavaScript is disabled or failed to load. Please enable JavaScript or contact Customer Support at 1-800-867-5409."
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: weather-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: weather-service
+  template:
+    metadata:
+      labels:
+        app: weather-service
+    spec:
+      containers:
+        - name: weather-service
+          image: ${WEATHER_SERVICE_IMAGE}
+          ports:
+            - containerPort: 9080
+          envFrom:
+            - configMapRef:
+                name: weather-service-config
+          env:
+            - name: WEATHER_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: weather-api-secret
+                  key: WEATHER_API_KEY
+                  optional: true
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 9080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: weather-service
+spec:
+  selector:
+    app: weather-service
+  ports:
+    - port: 80
+      targetPort: 9080
